@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.server.json",
+  "include": ["./"],
+  "exclude": [],
+  "references": [{ "path": "../types" }],
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "paths": {
+      "../types/": ["../types/"],
+      "../types/*": ["../types/*"]
+    }
+  }
+}

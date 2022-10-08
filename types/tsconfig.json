@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.server.json",
+  "include": ["./"],
+  "exclude": [],
+  "compilerOptions": {
+    "composite": true,
+    "incremental": true
+  }
+}

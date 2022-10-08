@@ -1,0 +1,7 @@
+// Import all of Bootstrap's CSS
+@import "~bootstrap/scss/bootstrap.scss";
+
+
+#pc-part-table {
+  max-width: map-get($grid-breakpoints, xxl);
+}

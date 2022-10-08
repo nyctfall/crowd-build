@@ -13,8 +13,6 @@ dist-ssr
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -25,9 +23,6 @@ dist-ssr
 
 # MacOS default directory files:
 .fseventsd
-
-# the Visual Studio Code, VSCodium, and Code-OSS editor workspace config file:
-*.code-workspace
 
 # the Jest code-base coverage report:
 /coverage/
