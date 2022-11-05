@@ -1,0 +1,116 @@
+version: "3.9"
+services:
+# the project Node.js server, the Dockerfile is in the same directory as this compose file:
+  web:
+    container_name: web
+    build: 
+# use the project dir Dockerfile:
+      context: .
+# set build time env of node prodution mode:
+      args:
+        NODE_ENV: production
+# node process env for port, mongodb URL, and redis URL:
+    environment:
+      PORT: "8080"
+      MONGODB: "mongodb://user:password@mongodb"
+      REDIS: "redis://db:6379"
+# use Node how-to recommendation of using Tini for Node.js containers:
+    init: true
+# use Node how-to recommendation of following the Principle of Least Privledge (PoLP) and using node user for Node.js containers:
+    user: node
+    ports:
+      - "8080:8080"
+# if you want a live update development environment:
+#    volumes:
+#      - ./:/usr/src/app:ro
+    depends_on:
+      - mongo
+      - redis
+
+  mongo:
+    container_name: mongo
+# mongo v5.0 is the latest for most people:
+    image: mongo:5.0
+# following the Principle of Least Privledge (PoLP) and using node user for Node.js containers:
+    user: mongodb
+    expose:
+      - "27017"
+# for mapping to host:
+#    ports:
+#      - "27017:27017"
+# default user name and password, should be changed if not in development:
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=user
+      - MONGO_INITDB_ROOT_PASSWORD=password
+# use database dir for mock development:
+    volumes:
+      - ./dist/mongodb-data:/data/db
+# use local config, read-only:
+      - ./mongo.conf.yml:/etc/mongod.conf:ro
+      - ./mongo.conf.yml:/usr/local/etc/mongod.conf:ro
+      - ./mongo.conf.yml:/etc/mongos.conf:ro
+      - ./mongo.conf.yml:/usr/local/etc/mongos.conf:ro
+# use configs syntax instead of volumes if necessary, or if you want newer syntax:
+#    configs:
+#      - source: mongoconf
+#        target: /etc/mongod.conf
+#      - source: mongoconf
+#        target: /usr/local/etc/mongod.conf
+#      - source: mongoconf
+#        target: /etc/mongos.conf
+#      - source: mongoconf
+#        target: /usr/local/etc/mongos.conf
+    networks:
+      - web-mongo
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    container_name: redis
+# "redislabs/redismod" has all the useful redis modules, switch when needed...
+# redis v6.0 is the latest for some people, v7.0 add many new features (eg: AOF optimizations), should upgrade soon:
+    image: redis:6.0
+# following the Principle of Least Privledge (PoLP) and using node user for Node.js containers:
+    user: redis
+    expose:
+      - "6379"
+      - "16379"
+      - "26379"
+# for mapping to host:
+#    ports:
+#      - "6379:6379"
+#      - "16379:16379"
+#      - "26379:26379"
+# database dir to do mock development:
+    volumes:
+      - ./dist/redis-cache/:/data
+# use redis.conf, as read-only 
+      - ./redis.conf:/etc/redis/redis.conf:ro
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+# use configs syntax instead of volumes if necessary, or if you want newer syntax:
+#    configs:
+#      - source: redisconf
+#        target: /etc/redis/redis.conf
+#      - source: redisconf
+#        target: /usr/local/etc/redis/redis.conf
+    networks:
+      - web-redis
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+# networks for internal container-to-container communications,
+# the Node.js server will use MongoDB as a database, and Redis as cache:
+networks:
+  web-mongo:
+  web-redis:
+
+# use configs syntax instead of volumes if necessary, or if you want newer syntax:
+#configs:
+#  redisconf:
+#    file: ./redis.conf
+#  mongoconf:
+#    file: ./mongo.conf.yml

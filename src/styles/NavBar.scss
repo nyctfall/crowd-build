@@ -1,0 +1,28 @@
+header .navbar-toggler {
+  --bs-navbar-toggler-focus-width: 2px;
+  border-width: 0px;
+}
+
+@media (max-width: 239.98px) {
+  #company-logo-name {
+    display: none;
+  }
+  #company-logo {
+    margin-right: 0rem !important;
+  }
+  header {
+    .navbar-brand {
+      --bs-navbar-brand-margin-end: 0.25rem;
+    }
+    .navbar-toggler {
+      --bs-navbar-toggler-focus-width: 1px;
+      padding-inline: 0rem;
+    }
+  }
+}
+
+@media (min-width: 240px) {
+  #company-dropdown-name, .company-dropdown-name {
+    display: none;
+  }
+}

@@ -1,20 +1,25 @@
 import { configureStore } from "@reduxjs/toolkit"
-import { partAPI } from "./query"
+import { rtkQueryAPISlice } from "./query"
 import partsDB from "./reducers/partsDB"
-import myList from "./reducers/list"
+import myList from "./reducers/myList"
+import allLists from "./reducers/allLists"
 import partSearchParams from "./reducers/search-params"
-import searchState from "./reducers/search-state";
+import searchState from "./reducers/search-state"
+import session from "./reducers/session"
+
 
 export const store = configureStore({
   reducer: {
     partsDB,
     myList,
+    allLists,
     partSearchParams,
     searchState,
-    [partAPI.reducerPath]: partAPI.reducer
+    session,
+    [rtkQueryAPISlice.reducerPath]: rtkQueryAPISlice.reducer
   },
   middleware: (getDefaultMiddleware) => {
-    return getDefaultMiddleware().concat(partAPI.middleware)
+    return getDefaultMiddleware().concat(rtkQueryAPISlice.middleware)
   }
 })
 

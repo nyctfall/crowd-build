@@ -3,38 +3,36 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ROOT = exports.server = exports.app = void 0;
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 const consolidate_1 = __importDefault(require("consolidate"));
 const cors_1 = __importDefault(require("cors"));
-const assets_router_js_1 = require("./assets-router.js");
+const assets_router_1 = require("./assets-router");
 const database_1 = require("./database");
+const login_1 = require("./login");
+const api_1 = require("../types/api");
 const app = (0, express_1.default)();
-const { PORT = 8080 } = process.env;
+exports.app = app;
+const { PORT = 8080, NODE_ENV } = process.env;
 const ROOT = path_1.default.join(__dirname, "../../../dist");
+exports.ROOT = ROOT;
+app.use(database_1.dbHandler);
+app.use(login_1.login);
 app.use((0, cors_1.default)({
-    origin: ["http://localhost:5173", `http://localhost:${PORT}`]
+    origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
 }));
 app.use("/", express_1.default.static(ROOT));
-app.use("/src", assets_router_js_1.router);
+app.use("/src", assets_router_1.router);
 app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: true }));
 app.engine("hbs", consolidate_1.default.handlebars);
 app.set("view engine", "hbs");
 app.set("views", "./views");
-app.get("/api/v1/parts", (req, res) => {
-    console.log("> /parts > req.query");
-    console.log(req.query);
-    res.json((0, database_1.DB)(req.query));
-});
-app.get("/api/v1", (req, res) => {
-    console.log("> req.query");
-    console.log(req.query);
-    res.json((0, database_1.DB)(req.query));
-});
 app.get("/", (_req, res) => {
     res.render("index", {
-        development: process.env.NODE_ENV !== "production",
-        production: process.env.NODE_ENV === "production"
+        development: NODE_ENV !== "production",
+        production: NODE_ENV === "production"
     });
 });
 app.get("/dev", (_req, res) => {
@@ -45,8 +43,8 @@ app.get("/prod", (_req, res) => {
 });
 app.get("/*", (_req, res) => {
     res.render("index", {
-        development: process.env.NODE_ENV !== "production",
-        production: process.env.NODE_ENV === "production"
+        development: NODE_ENV !== "production",
+        production: NODE_ENV === "production"
     });
 });
 const server = app.listen(PORT, () => {
@@ -54,45 +52,44 @@ const server = app.listen(PORT, () => {
     console.log(`\n\tNODE_ENV MODE: ${process.env.NODE_ENV === "production" ? "production" : "developement"}`);
     console.log(`\n\t> Local: http://localhost:${PORT}/`);
 });
+exports.server = server;
 const destroyServer = (() => {
     const CONNECTIONS = [];
     server.on("connect", (connection) => {
-        console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
         const index = CONNECTIONS.length;
         CONNECTIONS.push(connection);
-        console.log("open #", index);
+        (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connect\")"], "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "", "open #", index);
         connection.on("close", function () {
-            console.log("close #", index);
+            (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connect\")", "connection.on(\"close\")"], "close #", index);
             CONNECTIONS.splice(index);
         });
     });
     server.on("connection", (connection) => {
-        console.log("______________________________________________________________________");
         const index = CONNECTIONS.length;
         CONNECTIONS.push(connection);
-        console.log("open #", index);
+        (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connection\")"], "____________________________________________________________________", "", "open #", index);
         connection.on("close", function () {
-            console.log("close #", index);
+            (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connection\")", "connection.on(\"close\")"], "close #", index);
             CONNECTIONS.splice(index);
         });
     });
     return () => {
-        console.log("closing server...");
+        console.log("\n\tclosing server...");
         server.close();
-        console.log("destroying connections...");
+        console.log("\n\tdestroying connections...");
         for (let conn of CONNECTIONS) {
-            console.log("destroying a connection...");
+            console.log("\n\tdestroying a connection...");
             conn.destroy();
         }
         process.exit();
     };
 })();
 const exitServer = (signal) => {
-    console.log(`\nServer received SIGNAL: ${signal}`);
+    console.log(`\n\tServer received SIGNAL: ${signal}`);
     process.exit();
 };
 const cleanup = (exitCode) => {
-    console.log(`\nClosing HTTP server. Exit code: ${exitCode}`);
+    console.log(`\n\tClosing HTTP server. Exit code: ${exitCode}`);
     server.close();
     destroyServer();
     process.exit();

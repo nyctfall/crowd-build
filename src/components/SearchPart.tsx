@@ -1,8 +1,8 @@
-import React, { PropsWithChildren, useEffect, useState } from "react"
+import { PropsWithChildren, useEffect, useState } from "react"
 import { skipToken } from "@reduxjs/toolkit/query/react"
 import { ButtonGroup, ButtonToolbar, Container, Dropdown, DropdownButton, ToggleButton, ToggleButtonGroup } from "react-bootstrap"
 import "../styles/SearchPart.scss"
-import { PCPartType } from "../../types/api"
+import { dbgLog, PCPartType } from "../../types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useFetchPartsQuery } from "../redux-stuff/query"
 import { addManyParts } from "../redux-stuff/reducers/partsDB"
@@ -11,15 +11,16 @@ import StatefulSeachButton from "./StatefulSearchButton"
 import { setReSearched, setSearched } from "../redux-stuff/reducers/search-state"
 
 
+/**
+ * Search for PC parts by type.
+ */
 export default function SearchPart(){
-  // dispatch fetched data to store:
   const dispatch = useAppDispatch()
   
   // get search queryState from store
-  const queryState = useAppSelector(state => state.partSearchParams)
-  
   // get data from store: for DEBUG
-  const res = useAppSelector(state => state.partsDB)
+  const { partSearchParams: queryState, partsDB: res } = useAppSelector(state => state)
+  
   
   // part type has been selected at all state:
   const [canSearch, setCanSearch] = useState(
@@ -44,27 +45,20 @@ export default function SearchPart(){
   
   // add the fetched parts to the store:
   useEffect(() => {
+    dbgLog("SearchPart.tsx", ["SearchPart","useEffect(,[data, res])"], "res", res, "data", data)
+    
     if (data) {
-      console.log("~!!!!!!!!!!!!!!!data!!!!!!!!!!!!!!!!~")
-      console.log("res", res)
-      console.log("data", data)
-      console.log("~!!!!!!!!!!!!!!!data!!!!!!!!!!!!!!!!~")
-      
       dispatch(addManyParts(data))
     }
-    else { 
-      console.log("!~~~~~~~~~~~~~~~else~~~~~~~~~~~~~~~~!")
-      console.log("res", res)
-      console.log("data", data)
-      console.log("!~~~~~~~~~~~~~~~else~~~~~~~~~~~~~~~~!")
-    }
-  }, [data, res]) 
+  }, [data, res])
 
-  console.log("queryState",queryState,"canSearch",canSearch,"isSearching",isSearching,"isLoading",isLoading,"data",data)
+
+  dbgLog("SearchPart.tsx", "SearchPart", "queryState", queryState, "canSearch", canSearch, "isSearching", isSearching, "isLoading", isLoading, "data", data)
   
+
   // disable loading spinner:
   useEffect(() => {
-    console.log(">","queryState",queryState,"canSearch",canSearch,"isSearching",isSearching,"isLoading",isLoading,"data",data)
+    dbgLog("SearchPart.tsx", ["SearchPart","useEffect(,[isLoading, isSearching])"], "queryState", queryState, "canSearch", canSearch, "isSearching", isSearching, "isLoading", isLoading, "data", data)
     
     setSearching(isLoading)
   }, [isLoading, isSearching])
@@ -72,16 +66,13 @@ export default function SearchPart(){
   
   // on click to search db with api:
   const handleToggle = (e: React.MouseEvent<HTMLButtonElement | HTMLElement, MouseEvent>, newPartType: PCPartType) => {
+    dbgLog("SearchPart.tsx", ["SearchPart","handleToggle"], "toggle... newPartType", newPartType, "toggle... queryState.types", queryState.types, "e", e)
+    
     // check same data is not being re-searched:
     if (queryState.types.includes(newPartType)) return
     
-    console.log("toggle...", newPartType)
-    console.log("toggle...", queryState.types)
-    console.log(e, e.target, (e.target as any).control, ((e.target as any).control as any).value)
-    
     // select the type to be searched:
     dispatch(setAllFilterTypes([newPartType]))
-    console.log("toggle...", queryState.types, queryState.types)
 
     // enable searching now a type has been selected:
     setCanSearch(true)
@@ -90,12 +81,12 @@ export default function SearchPart(){
     dispatch(setReSearched(false))
   }
 
+
   const handleSearch = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    dbgLog("SearchPart.tsx", ["SearchPart","handleSearch"], "searching... queryState", queryState, "e", e)
+    
     // don't search if no selected type:
     if (!canSearch) return
-    
-    console.log("searching...", queryState)
-    console.log(e)
 
     // start search spinner:
     setSearching(true)
@@ -107,6 +98,7 @@ export default function SearchPart(){
     dispatch(setReSearched(true))
   }
   
+
   return (
     <Container fluid id="search-bar">
       <ButtonToolbar>
@@ -117,12 +109,12 @@ export default function SearchPart(){
           id="search-type-select" 
           variant={`${queryState.types[0] ? "" : "outline-" }secondary`}
         >
-          {Object.values(PCPartType).map(type =>
+          {Object.values(PCPartType).map((type, i) =>
             <Dropdown.Item 
+              key={i} 
               as={ToggleButton}
-              name={type}
               id={`${type}-${Math.ceil(Math.random()*Number.MAX_SAFE_INTEGER)}`}
-              key={type} 
+              name={type} 
               variant={`${queryState.types.includes(type) ? "" : "outline-"}secondary`} 
               value={type} 
               onClick={e => handleToggle(e, type)}
@@ -140,10 +132,10 @@ export default function SearchPart(){
           style={{ flexWrap: "wrap" }}
           id="search-type-toolbar"
         >
-          {Object.values(PCPartType).map(type =>
+          {Object.values(PCPartType).map((type, i) =>
             <ToggleButton 
+              key={i} 
               id={`${type}-${Math.ceil(Math.random()*Number.MAX_SAFE_INTEGER)}`}
-              key={type} 
               variant={`${queryState.types.includes(type) ? "" : "outline-"}secondary`} 
               value={type} 
               name={type} 

@@ -2,7 +2,9 @@ import { createEntityAdapter, createSlice } from "@reduxjs/toolkit"
 import type { PCPartInfo } from "../../../types/api"
 
 
-const partsDBAdapter = createEntityAdapter<PCPartInfo>()
+const partsDBAdapter = createEntityAdapter<PCPartInfo>({
+  selectId: part => part._id
+})
 
 export const partsDBSlice = createSlice({
   name: "partsDB",

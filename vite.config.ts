@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import legacy from "@vitejs/plugin-legacy"
@@ -23,6 +24,10 @@ export default defineConfig({
     watch: {
       ignored: ["server/"]
     }
+  },
+  define: {
+    "import.meta.vitest": undefined,
+    "import.meta.DEBUG": undefined
   },
   // for Bootstrap Sass lang and SCSS:
   resolve: {

@@ -1,83 +1,46 @@
+import { Button } from "react-bootstrap"
+import { LinkContainer } from "react-router-bootstrap"
+
+
+/**
+ * 
+ */
 export default function Root(){
   return (
     <>
       <h1>Root</h1>
+      
       <hr />
-      <div>hi</div>
-      <div>hello</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>fhcgjhdshello</div>
-      <div>helfhcgjhdso</div>
-      <div>hello</div>
-      <div>hfhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hello</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdslfhcgjhdslo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hi</div>
-      <div>hello</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>fhcgjhdshello</div>
-      <div>helfhcgjhdso</div>
-      <div>hello</div>
-      <div>hfhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hello</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdslfhcgjhdslo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hi</div>
-      <div>hello</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>fhcgjhdshello</div>
-      <div>helfhcgjhdso</div>
-      <div>hello</div>
-      <div>hfhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hello</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>helfhcgjhdslo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdslfhcgjhdslo</div>
-      <div>hfhcgjhdsello</div>
-      <div>hellfhcgjhdso</div>
-      <div>hellfhcgjhdso</div>
-      <div>hefhcgjhdsllo</div>
-      <div>hfhcgjhdsello</div>
+      
+      <LinkContainer to="/signin" className="m-5">
+        <Button>
+          Sign In!
+        </Button>
+      </LinkContainer>
+
+      <br />
+
+      <LinkContainer to="/home" className="m-5">
+        <Button>
+          Main Page
+        </Button>
+      </LinkContainer>
+
+      <br />
+
+      <LinkContainer to="/my-list" className="m-5">
+        <Button>
+          Search for Lists to Copy!
+        </Button>
+      </LinkContainer>
+
+      <br />
+
+      <LinkContainer to="/database" className="m-5">
+        <Button>
+          Search for Parts to add to your list!
+        </Button>
+      </LinkContainer>
     </>
   )
 }

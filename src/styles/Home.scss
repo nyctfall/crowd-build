@@ -1,0 +1,75 @@
+// @use "../index.scss" as *;
+
+
+#headliner {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 90vh;
+  min-width: 100%;
+  padding: 0%;
+
+  &, & > *, & > * > * {
+    display: flex;
+  }
+
+  &, & > *, & > * > * {
+    transition-property: all, flex, flex-basis, flex-grow, flex-shrink;
+    transition-duration: 2s;
+    transition-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
+    flex-grow: 1;
+  }
+  
+  & > * {
+    flex-direction: row;
+    margin: 0;
+  }
+  
+  & > * > * {
+    margin: 0;
+    z-index: 0;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  
+  & > *:hover {
+    flex-grow: 300%;
+  }
+  /* & > *:active {
+    flex-grow: 300%;
+  } */
+  
+  & > * > *:hover {
+    flex-grow: 200%;
+    z-index: 1;
+  }
+  /* & > * > *:active {
+    flex-grow: 200%;
+    z-index: 1;
+  } */
+  
+  &:hover > *:not(:hover), & > *:hover > *:not(:hover) {
+    flex-grow: 0.2;
+    overflow: hidden;
+  }
+  /* &:active > *:not(:active), & > *:active > *:not(:active) {
+    flex-grow: 0.2;
+    overflow: hidden;
+  } */
+}
+
+
+// width is bootstrap md breakpoint
+@media (max-width: 767.98px), (max-height: 720px) {
+  #headliner {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (min-height: 720.02px) {
+  #headliner-mini {
+    display: none;
+  }
+}

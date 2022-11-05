@@ -14,6 +14,6 @@ assetsRouter.get(imageRegex, (req, res) => {
 assetsRouter.get(videoRegex, (req, res) => {
   const filePath = req.path
   res.redirect(303, `http://localhost:5173/src${filePath}`)
-});
+})
 
 export { assetsRouter as router }

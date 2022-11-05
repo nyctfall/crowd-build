@@ -1,154 +1,351 @@
-import Big from "big.js"
-import { Request } from "express"
-import { PCPartInfo, PCPartSearchURI } from "../types/api"
-import { PCPartType } from "../types/api"
+import cors from "cors"
+import express from "express"
+import mongoose from "mongoose"
+import Parts from "./models/part"
+import Lists from "./models/list"
+import Users from "./models/user"
+import News from "./models/news"
+import { dbgLog } from "../types/api"
 
+/**
+ * @file The logic and HTTP handlers for the database quests and other db operations.
+ */
 
-const testData: PCPartInfo[] = [
-  {
-    "id": "1",
-    "name": "AMD Ryzen 9 5950X",
-    "manufacturer": "AMD",
-    "model": "Ryzen 9 5950X",
-    "released": "11/5/2020",
-    "MSRP": 799,
-    "type": PCPartType["CPU"],
-    "typeInfo": {
-      "Codename": "Vermeer",
-      "Cores": 16,
-      "Treads": 32,
-      "Max Boost Clock": "4.95GHz",
-      "Base Clock": "3.4GHz",
-      "L2 Cache": "8MB",
-      "L3 Cache": "64MB",
-      "TDP": "105W",
-      "Node": "TSMC 7nm FinFET",
-      "OC": true,
-      "Socket": "AM4",
-      "Tjmax": "90C",
-      "Memory": "3200MHz DDR4",
-      "PCIe": "PCIe 4.0",
-      "ID Tray": "100-000000059",
-      "ID Boxed": "100-100000059WOF"
-    }
-  },
-  {
-    "id": "2",
-    "name": "AMD Ryzen 9 5900X",
-    "manufacturer": "AMD",
-    "model": "Ryzen 9 5900X",
-    "released": "11/5/2020",
-    "MSRP": 549,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "3",
-    "name": "AMD Ryzen 7 5800X3D",
-    "manufacturer": "AMD",
-    "model": "Ryzen 7 5800X3D",
-    "released": "4/20/2022",
-    "MSRP": 449,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "4",
-    "name": "AMD Ryzen 7 5800X",
-    "manufacturer": "AMD",
-    "model": "Ryzen 7 5800X",
-    "released": "11/5/2020",
-    "MSRP": 449,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "5",
-    "name": "AMD Ryzen 7 5700X",
-    "manufacturer": "AMD",
-    "model": "Ryzen 7 5700X",
-    "released": "4/4/2022",
-    "MSRP": 299,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "6",
-    "name": "AMD Ryzen 5 5600X",
-    "manufacturer": "AMD",
-    "model": "Ryzen 5 5600X",
-    "released": "11/5/2020",
-    "MSRP": 299,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "7",
-    "name": "AMD Ryzen 5 5600",
-    "manufacturer": "AMD",
-    "model": "Ryzen 5 5600",
-    "released": "4/4/2022",
-    "MSRP": 199,
-    "type": PCPartType["CPU"]
-  },
-  {
-    "id": "8",
-    "name": "AMD Ryzen 5 5500",
-    "manufacturer": "AMD",
-    "model": "Ryzen 5 5500",
-    "released": "4/4/2022",
-    "MSRP": 159,
-    "type": PCPartType["CPU"]
-  }
-]
+const dbHandler = express.Router()
 
+const { MONGODB, REDIS, PORT = 8080 } = process.env
 
-/** @todo Redis cache test DB */
-export const DB = (query: qs.ParsedQs | Record<string, string | string[]>): PCPartInfo[] => {
-  const params = new PCPartSearchURI({
-    ...query,
-    ids: (query.id ?? query.ids as any),
-    oems: (query.oem ?? query.oems as any),
-    types: (query.type ?? query.types as any),
-  })
+// on connection promise:
+let mongoDBReady = new Promise((resolve) => {
+  const sayReady = () => resolve(true)
   
-  /** @todo Redis cache test DB */
-  let res: PCPartInfo[] = testData
+  mongoose.connection.on("connected", sayReady).on("connecting", sayReady).on("open", sayReady)
+})
+
+// for parsing application/json
+dbHandler.use(express.json())
+// for parsing application/x-www-form-urlencoded
+dbHandler.use(express.urlencoded({ extended: true }))
+
+// CORS headers for dev server:
+dbHandler.use(cors({
+  origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
+}))
+
+// mongodb server:
+if (MONGODB){
+  ;(async () => {
+    try {
+      // connect to DB:
+      await mongoose.connect(MONGODB)
+      
+      console.log(`\n\t> MongoDB: "${MONGODB}" ready...\n`)
+      
+      // mongodb server is up and running:
+      mongoDBReady = Promise.resolve(true)
+      
+      // part database:
+      dbHandler.route("/api/v1/parts")
+      /** @todo User suggested/voted parts POST, PATCH, DELETE? */
+      .get(async (req, res) => {
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          
+
+          const id: any = req.query.id ?? req.query.ids
+          const name: any = req.query.name ?? req.query.names
+          const type: any = req.query.type ?? req.query.types
+          const oem: any = req.query.oem ?? req.query.oems
+          const model: any = req.query.model ?? req.query.models
+          const minPrice: any = req.query.minPrice
+          const maxPrice: any = req.query.maxPrice
+          const releasedAfter: any = req.query.releasedAfter
+          const releasedBefore: any = req.query.releasedBefore
+          const typeInfo: any = req.query.typeInfo
+
+          // skip certain number of newest stories:
+          const offset = Number(req.query.offset ?? 0)
+          // only get limited number of stories:
+          const limit = Number(req.query.limit ?? 1)
+          
+          
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "id", id, "name", name, "type", type, "oem", oem, "model", model, "minPrice", minPrice, "maxPrice", maxPrice, "releasedAfter", releasedAfter, "releasedBefore", releasedBefore, "typeInfo", typeInfo, "offset", offset, "limit", limit)
 
 
-  console.log("query")
-  console.log(query)
-  console.log("params")
-  console.log(params)
-  console.log("params.filterIDs.array")
-  console.log(params.filterIDs.array)
-  console.log("params.filterOEMs.array")
-  console.log(params.filterOEMs.array)
-  console.log("params.filterTypes.array")
-  console.log(params.filterTypes.array)
-  console.log("params.maxPriceFilter")
-  console.log(params.maxPriceFilter)
-  console.log("params.minPriceFilter")
-  console.log(params.minPriceFilter)
-  // get only by id:
-  if (params.filterIDs.array.length > 0) res = res.filter(({ id }) => params.filterIDs.array.includes(id))
-  else {
-    // get by type:
-    if (params.filterTypes.length > 0) res = res.filter(({ type }) => params.filterTypes.includes(type))
-    
-    // get by manufacturer:
-    if (params.filterOEMs.length > 0) res = res.filter(({ manufacturer }) => params.filterOEMs.includes(manufacturer as string))
-    
-    // get by MSRP:
-    if (params.minPriceFilter instanceof Big || params.maxPriceFilter instanceof Big) {
-      // only get greater or equal to than min:
-      if (params.minPriceFilter instanceof Big) res = res.filter(({ MSRP }) => params.minPriceFilter?.lte(MSRP))
+          // get a part by query params:
+          const dbQuery = Parts.find()
+          
+          if (id) dbQuery.byId(id)
+          if (name) dbQuery.byName(name)
+          if (type) dbQuery.byType(type)
+          if (oem) dbQuery.byOEM(oem)
+          if (model) dbQuery.byModel(model)
+          if (minPrice) dbQuery.byMinPrice(minPrice)
+          if (maxPrice) dbQuery.byMaxPrice(maxPrice)
+          if (releasedAfter) dbQuery.byReleasedAfter(releasedAfter)
+          if (releasedBefore) dbQuery.byReleasedBefore(releasedBefore)
+          if (typeInfo) dbQuery.byTypeInfo(typeInfo)
+          
+          const dbRes = await dbQuery.exec()
+  
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "dbRes", dbRes)
+          
+
+          // if there was no error, return result, which could be an empty array:
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch(e){
+          console.error(e)
+
+          // the db threw an error, somthing was wrong:
+          res.sendStatus(400)
+        }
+      })
       
-      // only get less or equal to than max:
-      if (params.maxPriceFilter instanceof Big) res = res.filter(({ MSRP }) => params.maxPriceFilter?.gte(MSRP))
+      dbHandler.route("/api/v1/parts/id/:id")
+      /** @todo User suggested/voted parts POST, PATCH, DELETE? */
+      .get(async (req, res) => {
+        // find one part by its id:
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.get(\"/api/v1/parts/id/:id\")"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          
+
+          const dbRes = await Parts.findById(req.params.id).exec()
+          
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.get(\"/api/v1/parts/id/:id\")"], "req.path", req.path, "dbRes", dbRes)
+          
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+          
+          res.sendStatus(400)
+        }
+      })
       
-      // both greater than or equal to min and less than or equal to max:
-      if (params.minPriceFilter instanceof Big && params.maxPriceFilter instanceof Big) res = res.filter(
-        ({ MSRP }) => params.minPriceFilter?.lte(MSRP) && params.maxPriceFilter?.gte(MSRP)
-      )
+      // user created lists:
+      dbHandler.route("/api/v1/lists")
+      .get(async (req, res) => {
+        // send all lists:
+        try {
+          // skip certain number of newest stories:
+          const offset = Number(req.query.offset ?? 0)
+          // only get limited number of stories:
+          const limit = Number(req.query.limit ?? 1)
+          
+          
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          
+          
+          const dbRes = await Lists.find().sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
+          
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").get"], "dbRes", dbRes)
+          
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+          
+          res.sendStatus(400)
+        }
+      })
+      // save a list to db:
+      .post(async (req, res) => {
+        try {
+          
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          
+
+          const dbRes = await new Lists({ parts: req.body.parts }).save()
+          
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").post"], "dbRes", dbRes)
+          
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+          
+          res.sendStatus(400)
+        }
+      })
+      
+      // get, edit, or delete a list:
+      dbHandler.route("/api/v1/lists/id/:id")
+      .get(async (req, res) => {
+        // send the list at id if there is one:
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await Lists.findById(req.params.id).exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").get"], "req.path", req.path, "dbRes", dbRes)
+          
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+      .patch(async (req, res) => {
+        // only edit lists not owned by a user:
+        // note: mongoose only supports limited validation using find and update
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await Lists.updateOne({ _id: req.params.id, user: { $exists: false } }, { $set: { parts: req.body.parts } }).exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").patch"], "req.path", req.path, "dbRes", dbRes)
+
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+      .delete(async (req, res) => {
+        // only delete lists not owned by a user:
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await Lists.deleteOne({ _id: req.params.id, user: { $exists: false } }).exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").delete"], "req.path", req.path, "dbRes", dbRes)
+
+          
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+
+      // get, edit, or delete a user:
+      dbHandler.route("/api/v1/users/id/:id")
+      .get(async (req, res) => {
+        // send the user at id if there is one:
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await Users.findById(req.params.id).select("-password").exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users/id/:id\").get"], "req.path", req.path, "dbRes", dbRes)
+
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e) {
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+
+      // save a new user to db:
+      dbHandler.route("/api/v1/users")
+      .get(async (req, res) => {
+        // get all users's usernames and ids:
+        try {
+          // skip certain number of newest stories:
+          const offset = Number(req.query.offset ?? 0)
+          // only get limited number of stories:
+          const limit = Number(req.query.limit ?? 1)
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await Users.find().select("-password").sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").get"], "dbRes", dbRes)
+
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e){
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+      .post(async (req, res) => {
+        try {
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await new Users(req.body).save()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "dbRes", dbRes)
+
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e){
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
+
+      // news story db:
+      dbHandler.get("/api/v1/news", async (req, res) => {
+        // find latest news, limit is number of stories, and offset is how many of the latests to skip:
+        try {
+          // skip certain number of newest stories:
+          const offset = Number(req.query.offset ?? 0)
+          // only get limited number of stories:
+          const limit = Number(req.query.limit ?? 1)
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+
+
+          const dbRes = await News.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
+
+
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "dbRes", dbRes)
+
+
+          if (dbRes != null) res.json(dbRes)
+          else res.sendStatus(404)
+        } catch (e){
+          console.error(e)
+
+          res.sendStatus(400)
+        }
+      })
     }
-  }
+    catch (err){
+      // something went wrong connecting to DB:
+      console.error(err)
+    }  
+  })()  
+}  
 
-  console.log(params,res)
-  return res
-}
+
+export { dbHandler, mongoDBReady }

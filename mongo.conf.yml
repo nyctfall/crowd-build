@@ -1,0 +1,35 @@
+storage:
+  dbPath: "/data/db"
+  directoryPerDB: true
+  journal:
+    enabled: true
+  inMemory:
+    engineConfig:
+      inMemorySizeGB: 1
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 1
+      directoryForIndexes: true
+
+systemLog:
+  destination: file
+  path: "/data/db/mongodb.log"
+  logAppend: true
+
+auditLog:
+  destination: "/data/db"
+  compressionMode: none
+  format: JSON
+  path: "/data/db/mongodb-audit.log"
+
+net:
+  bindIp: 127.0.0.1
+# 27017 for mongod (if not a shard member or a config server member) or mongos instance:
+  port: 27017
+  wireObjectCheck: true
+
+security:
+  authorization: disabled
+
+setParameter:
+  enableLocalhostAuthBypass: false
