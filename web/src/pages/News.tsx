@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Button, Col, Container, Row } from "react-bootstrap"
 import { useFetchNewsQuery } from "../redux-stuff/query"
-import { dbgLog, NewsStory } from "../../types/api"
+import { dbgLog, NewsStory } from "~types/api"
 
 
 /**

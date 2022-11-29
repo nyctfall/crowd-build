@@ -1,3 +1,3 @@
 declare const assetsRouter: import("express-serve-static-core").Router;
-export { assetsRouter as router };
+export { assetsRouter };
 //# sourceMappingURL=assets-router.d.ts.map

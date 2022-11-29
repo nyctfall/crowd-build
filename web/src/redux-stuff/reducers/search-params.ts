@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
-import { idFilterBuilder, oemFilterBuilder, PCPartSearchParamsState, PCPartSearchURI, PCPartType, typeFilterBuilder } from "../../../types/api"
+import { idFilterBuilder, oemFilterBuilder, PCPartSearchParamsState, PCPartSearchURI, PCPartType, typeFilterBuilder } from "~types/api"
 
 const initialState: PCPartSearchParamsState = {
   ids: [],

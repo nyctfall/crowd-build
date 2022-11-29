@@ -1,7 +1,22 @@
-import mongoose, { ObjectId, Schema } from "mongoose"
-import { PCPartInfo, PCPartType } from "../../types/api"
+import mongoose, { ObjectId, Schema, Model, Query, Document } from "mongoose"
+import { PCPartInfo, PCPartType } from "~types/api"
 
-const PartSchema = new Schema({
+
+export interface PCPartInfoQueryHelpers {
+  byId(id: ObjectId | string | ObjectId[] | string[]): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byName(name: string): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byModel(model: string | string[] | RegExp | RegExp[]): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byOEM(oem: string | string[]): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byType(type: PCPartType): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byMaxPrice(maxPrice: string | number | Schema.Types.Decimal128 | Schema.Types.Number): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byMinPrice(minPrice: string | number | Schema.Types.Decimal128 | Schema.Types.Number): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byReleasedBefore(maxDate: Date | string): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byReleasedAfter(minDate: Date | string): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+  byTypeInfo(info: Record<string | number, any>): Query<any, Document<PCPartInfo>> & PCPartInfoQueryHelpers
+}
+
+
+const PartSchema = new Schema<PCPartInfo, Model<PCPartInfo, PCPartInfoQueryHelpers>>({
     // name could be substituted with `${model} ${oem}`:
     name: {
       type: String,
@@ -40,7 +55,7 @@ const PartSchema = new Schema({
       type: Date,
       required: true
     }
-  } as Record<keyof PCPartInfo | string, any>,
+  },
   {
     timestamps: true,
     toObject: {
@@ -99,5 +114,7 @@ const PartSchema = new Schema({
 )
 
 
-const Part = mongoose.model("Part", PartSchema)
+const Part = mongoose.model<PCPartInfo, Model<PCPartInfo, PCPartInfoQueryHelpers>>("Part", PartSchema)
+
+
 export default Part

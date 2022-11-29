@@ -1,8 +1,7 @@
-import { PropsWithChildren, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { skipToken } from "@reduxjs/toolkit/query/react"
-import { ButtonGroup, ButtonToolbar, Container, Dropdown, DropdownButton, ToggleButton, ToggleButtonGroup } from "react-bootstrap"
-import "../styles/SearchPart.scss"
-import { dbgLog, PCPartType } from "../../types/api"
+import { ButtonToolbar, Container, Dropdown, DropdownButton, ToggleButton, ToggleButtonGroup } from "react-bootstrap"
+import { dbgLog, PCPartType } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useFetchPartsQuery } from "../redux-stuff/query"
 import { addManyParts } from "../redux-stuff/reducers/partsDB"
@@ -65,7 +64,7 @@ export default function SearchPart(){
 
   
   // on click to search db with api:
-  const handleToggle = (e: React.MouseEvent<HTMLButtonElement | HTMLElement, MouseEvent>, newPartType: PCPartType) => {
+  const handleToggle = (e: React.MouseEvent<HTMLButtonElement | HTMLElement, MouseEvent> | React.ChangeEvent<HTMLInputElement>, newPartType: PCPartType) => {
     dbgLog("SearchPart.tsx", ["SearchPart","handleToggle"], "toggle... newPartType", newPartType, "toggle... queryState.types", queryState.types, "e", e)
     
     // check same data is not being re-searched:
@@ -104,15 +103,13 @@ export default function SearchPart(){
       <ButtonToolbar>
         {/* for small screens: dropdown */}
         <DropdownButton 
-          as={ButtonGroup} 
-          title={ queryState.types[0] ? `Type: ${queryState.types[0]}` : "Part Type"} 
+          title={queryState.types[0] ? `Type: ${queryState.types[0]}` : "Part Type"} 
           id="search-type-select" 
           variant={`${queryState.types[0] ? "" : "outline-" }secondary`}
         >
           {Object.values(PCPartType).map((type, i) =>
             <Dropdown.Item 
               key={i} 
-              as={ToggleButton}
               id={`${type}-${Math.ceil(Math.random()*Number.MAX_SAFE_INTEGER)}`}
               name={type} 
               variant={`${queryState.types.includes(type) ? "" : "outline-"}secondary`} 
@@ -126,10 +123,11 @@ export default function SearchPart(){
         
         {/* for large screens: toolbar */}
         <ToggleButtonGroup 
-          aria-label="SearchPCPartType" 
           name="SearchPCPartType" 
           type="radio" 
-          style={{ flexWrap: "wrap" }}
+          style={{ 
+            flexWrap: "wrap"
+          }}
           id="search-type-toolbar"
         >
           {Object.values(PCPartType).map((type, i) =>
@@ -139,7 +137,8 @@ export default function SearchPart(){
               variant={`${queryState.types.includes(type) ? "" : "outline-"}secondary`} 
               value={type} 
               name={type} 
-              onClick={e => handleToggle(e, type)}
+              type="radio" 
+              onChange={(e) => handleToggle(e, type)}
             >
               {type}
             </ToggleButton>

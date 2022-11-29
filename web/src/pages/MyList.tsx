@@ -2,7 +2,7 @@ import { Button, Container } from "react-bootstrap"
 import { LinkContainer } from "react-router-bootstrap"
 import PCPartList from "../components/PCPartList"
 import { useAppSelector } from "../redux-stuff/hooks"
-import type { PCPartInfo } from "../../types/api"
+import type { PCPartInfo } from "~types/api"
 import SearchListDB from "../components/SearchListDB"
 import CreateListButton from "../components/CreateListButton"
 

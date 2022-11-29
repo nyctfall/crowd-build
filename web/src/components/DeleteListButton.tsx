@@ -3,7 +3,7 @@ import { Button, Spinner } from "react-bootstrap"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useDeleteListMutation } from "../redux-stuff/query"
 import { removeList } from "../redux-stuff/reducers/allLists"
-import { dbgLog, DeleteResponce, SessionType } from "../../types/api"
+import { dbgLog, DeleteResponce, SessionType } from "~types/api"
 
 
 /** 

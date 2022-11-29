@@ -7,6 +7,7 @@ export interface UserType {
   lists?: Types.ObjectId[]
 }
 
+
 const UserSchema = new Schema<UserType>({
     username: {
       type: String,
@@ -49,4 +50,6 @@ const UserSchema = new Schema<UserType>({
 )
 
 const Users = mongoose.model<UserType>("User", UserSchema)
+
+
 export default Users

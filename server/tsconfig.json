@@ -1,14 +1,11 @@
 {
-  "extends": "../tsconfig.server.json",
-  "include": ["./"],
+  "extends": "../tsconfig.json",
   "exclude": [],
-  "references": [{ "path": "../types" }],
   "compilerOptions": {
     "composite": true,
     "incremental": true,
-    "paths": {
-      "../types/": ["../types/"],
-      "../types/*": ["../types/*"]
-    }
+    "outDir": "../dist-tsc/",
+    "declarationDir": "../dist-tsc/",
+    "module": "CommonJS"
   }
 }

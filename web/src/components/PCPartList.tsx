@@ -1,7 +1,6 @@
 import { Container, Table } from "react-bootstrap"
 import PCPart from "./PCPart"
-import type { PCPartInfo } from "../../types/api"
-import "../styles/PCPartList.scss"
+import type { PCPartInfo } from "~types/api"
 
 
 /**
@@ -11,7 +10,7 @@ import "../styles/PCPartList.scss"
  */
 export default function PCPartList({ list = [] }: { list: PCPartInfo[] }){
   return (
-    <Container fluid>
+    <Container fluid="xl">
       <Table id="pc-part-table" className="mx-auto">
         <tbody>
           {list.map((part, i) => (

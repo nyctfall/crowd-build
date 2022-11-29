@@ -1,1 +1,1 @@
-{"version":3,"file":"post.d.ts","sourceRoot":"","sources":["../../../../server/models/post.ts"],"names":[],"mappings":""}
+{"version":3,"file":"post.d.ts","sourceRoot":"","sources":["../../server/models/post.ts"],"names":[],"mappings":""}

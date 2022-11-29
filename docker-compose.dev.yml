@@ -13,7 +13,7 @@ services:
     environment:
       PORT: "8080"
       MONGODB: "mongodb://user:password@mongodb"
-      REDIS: "redis://db:6379"
+      REDIS: "redis://redis:6379"
 # use Node how-to recommendation of using Tini for Node.js containers:
     init: true
 # use Node how-to recommendation of following the Principle of Least Privledge (PoLP) and using node user for Node.js containers:
@@ -26,6 +26,9 @@ services:
     depends_on:
       - mongo
       - redis
+    networks:
+      - web-mongo
+      - web-redis
 
   mongo:
     container_name: mongo
@@ -42,9 +45,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=user
       - MONGO_INITDB_ROOT_PASSWORD=password
-# use database dir for mock development:
     volumes:
-      - ./dist/mongodb-data:/data/db
 # use local config, read-only:
       - ./mongo.conf.yml:/etc/mongod.conf:ro
       - ./mongo.conf.yml:/usr/local/etc/mongod.conf:ro
@@ -83,9 +84,7 @@ services:
 #      - "6379:6379"
 #      - "16379:16379"
 #      - "26379:26379"
-# database dir to do mock development:
     volumes:
-      - ./dist/redis-cache/:/data
 # use redis.conf, as read-only 
       - ./redis.conf:/etc/redis/redis.conf:ro
       - ./redis.conf:/usr/local/etc/redis/redis.conf:ro

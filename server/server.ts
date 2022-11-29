@@ -1,156 +1,147 @@
-import express from "express"
-import path from "path"
-// import { createRequire } from "node:module"
-// import { dirname } from "node:path"
-// import { fileURLToPath } from "node:url"
-// const require = createRequire(import.meta.url)
-import cons from "consolidate" // const cons = require("consolidate")
-import cors from "cors" // const cors = require("cors")
-// const __filename = fileURLToPath(import.meta.url)
-// const __dirname = dirname(__filename)
-import { router as assetsRouter } from "./assets-router"
+// load dotenv .env before all modules:
+require("dotenv").config({ path: "../.env" })
+import path from "node:path"
+import fs from "node:fs"
+import express, { ErrorRequestHandler } from "express"
+import cons from "consolidate"
+import cors from "cors"
+import { dbgLog } from "~types/api"
+import { assetsRouter } from "./assets-router"
 import { dbHandler } from "./database"
-import { login } from "./login"
-import type { Duplex } from "stream"
-import type { PathLike } from "fs"
-import { dbgLog } from "../types/api"
+import { login, passportInit, loginSession, passportSession } from "./login"
+const MANIFEST_JSON = require("../dist/manifest.json")
 
 
+/**
+ * @file The main server.
+ */
+
+
+/**
+ * The main Express app that imports all the other Express Routers for separated concerns.
+ */
 const app = express()
 
-// server port, MongoDB db server URI, Redis cache/db server URI:
-const { PORT = 8080, NODE_ENV } = process.env
 
 // server root file path, relative to tsc outDir for this file:
-const ROOT: string & PathLike = path.join(__dirname, "../../../dist")
+const PROJECT_ROOT: string & fs.PathLike = path.join(__dirname, "../")
+const STATIC_ROOT: string & fs.PathLike = path.join(PROJECT_ROOT, "./dist")
 
 
-// mongodb server handler:
-app.use(dbHandler)
-// user account log-in handler:
-app.use(login)
+const { 
+  // server port:
+  PORT = 8080, 
+  // vite dev server port:
+  VITE_PORT = 5173, 
+  NODE_ENV 
+} = process.env
 
-// CORS headers for dev server:
+
+// init debug logger:
+const log = dbgLog.fileLogger("server.ts")
+
+
+// CORS headers for vite dev server:
 app.use(cors({
-  origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
+  origin: ["*", `http://localhost:${VITE_PORT}`, `http://localhost:${PORT}`]
 }))
 
-app.use("/", express.static(ROOT))
 
-// dev server router:
-app.use("/src", assetsRouter)
+// vite output dir as static dir:
+app.use(express.static(STATIC_ROOT))
 
-// for parsing application/json
+// for parsing application/json:
 app.use(express.json())
-// for parsing application/x-www-form-urlencoded
+
+// for parsing application/x-www-form-urlencoded:
 app.use(express.urlencoded({ extended: true }))
 
 // handlebars template engine:
 app.engine("hbs", cons.handlebars)
+
 app.set("view engine", "hbs")
-app.set("views", "./views")
+
+app.set("views", path.join(PROJECT_ROOT, "./views"))
 
 
+// logging middleware:
+app.use((req, _res, next) => {
+  log("app.use", 
+    "req.originalUrl", req.originalUrl, 
+    "req.url", req.url, 
+    "req.baseUrl", req.baseUrl, 
+    "req.path", req.path, 
+    "req.route", req.route, 
+    "req.hostname", req.hostname, 
+    "req.cookies", req.cookies, 
+    "req.signedCookies", req.signedCookies, 
+    "req.headers", req.headers, 
+    "req.user", req.user, 
+    "req.protocol", req.protocol, 
+    "req.method", req.method, 
+    "req.xhr", req.xhr, 
+    "req.query", req.query, 
+    "req.params", req.params, 
+    "req.body", req.body
+  )
+  
+  next()
+})
 
-app.get("/", (_req, res) => {
+// dev server router:
+app.use("/src", assetsRouter)
+
+
+// mongodb server handler and user account handler:
+app.use("/api/v1", dbHandler, login)
+app.use(loginSession)
+app.use(passportInit)
+app.use(passportSession)
+
+
+app.get("/*", (req, res) => {
+  // const mapping = MANIFEST_JSON["src/main.tsx"]
+  const mapping = Object.values(MANIFEST_JSON as Record<string, Record<string, string | string[] | boolean>>).filter(chunk => chunk.isEntry)
+
+  // vite dev script for React.js HMR:
+  const VITE_DEV = `
+    <script type="module">
+      import RefreshRuntime from "http://localhost:${VITE_PORT}/@react-refresh"
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (type) => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+
+    <script type="module" src="http://localhost:${VITE_PORT}/@vite/client"></script>
+    <script type="module" src="http://localhost:${VITE_PORT}/${mapping.find(chunk => "css" in chunk)?.src}"></script>
+`
+  // log("MANIFEST_JSON isEntry mapping", mapping, "VITE_DEV", VITE_DEV)
+
+
   res.render("index", {
-    development: NODE_ENV !== "production",
-    production: NODE_ENV === "production"
+    production: NODE_ENV === "production",
+    VITE_DEV,
+    js: mapping.map(entryChunk => entryChunk.file),
+    css: mapping.filter(entryChunk => "css" in entryChunk).map(entryChunk => entryChunk.css).flat(Infinity)
   })
 })
 
-app.get("/dev", (_req, res) => {
-  res.sendFile("./dev.html", { root: ROOT })
-})
 
-app.get("/prod", (_req, res) => {
-  res.sendFile("./prod.html", { root: ROOT })
-})
+// don't emit errors to clients:
+app.use(((err, _req, res, _next) => {
+  console.error(err)
 
-app.get("/*", (_req, res) => {
-  res.render("index", {
-    development: NODE_ENV !== "production",
-    production: NODE_ENV === "production"
-  })
-})
+  // internal server error:
+  res.sendStatus(500)
+}) as ErrorRequestHandler)
+
 
 const server = app.listen(PORT, () => {
   console.log(`\n\tApp running in port ${PORT}`)
-  console.log(`\n\tNODE_ENV MODE: ${process.env.NODE_ENV === "production" ? "production" : "developement"}`)
+  console.log(`\n\tNODE_ENV MODE: "${process.env.NODE_ENV === "production" ? "production" : "developement"}"`)
   console.log(`\n\t> Local: http://localhost:${PORT}/`)
 })
 
-export { app, server, ROOT }
 
-/** @summary - closes server. */
-const destroyServer = (()=>{
-  const CONNECTIONS: Duplex[] = []
-  
-  server.on("connect", (connection: Duplex) => {
-    const index = CONNECTIONS.length
-    
-    CONNECTIONS.push(connection)
-    
-    dbgLog("server.ts", ["destroyServer","server.on(\"connect\")"], "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "", "open #", index)
-    
-    connection.on("close", function() {
-      dbgLog("server.ts", ["destroyServer","server.on(\"connect\")","connection.on(\"close\")"], "close #", index)
-      
-      CONNECTIONS.splice(index)
-    })
-  })
-  
-  server.on("connection", (connection: Duplex) => {
-    const index = CONNECTIONS.length
-    
-    CONNECTIONS.push(connection)
-    
-    dbgLog("server.ts", ["destroyServer","server.on(\"connection\")"], "____________________________________________________________________", "", "open #", index)
-    
-    connection.on("close", function() {
-      dbgLog("server.ts", ["destroyServer","server.on(\"connection\")","connection.on(\"close\")"], "close #", index)
-
-      CONNECTIONS.splice(index)
-    })
-  })
-
-  return () => {
-    console.log("\n\tclosing server...")
-
-    server.close()
-    
-    console.log("\n\tdestroying connections...")
-
-    for (let conn of CONNECTIONS){
-      console.log("\n\tdestroying a connection...")
-
-      conn.destroy()
-    }
-
-    process.exit()
-  }
-})()
-  
-// clean exit to close server
-const exitServer = (signal: string) => {
-  console.log(`\n\tServer received SIGNAL: ${signal}`)
-
-  process.exit()
-}
-
-const cleanup = (exitCode: number) => {
-  console.log(`\n\tClosing HTTP server. Exit code: ${exitCode}`)
-  
-  // prevent server from accepting new connections:
-  server.close()
-
-  // end current connections:
-  destroyServer()
-
-  process.exit()
-}
-
-process.on("exit", cleanup)
-process.on("SIGTERM", exitServer)
-process.on("SIGINT", exitServer)
-process.on("SIGHUP", exitServer)
+export { app, server, STATIC_ROOT as ROOT }

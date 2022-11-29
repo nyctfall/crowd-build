@@ -1,6 +1,6 @@
 import { Placeholder, Table } from "react-bootstrap"
 import { Container } from "react-bootstrap"
-import { dbgLog } from "../../types/api"
+import { dbgLog } from "~types/api"
 import useCacheList from "../hooks/useCacheList"
 import PCPartId from "./PCPartId"
 

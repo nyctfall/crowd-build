@@ -1,6 +1,14 @@
 import mongoose, { ObjectId, Schema } from "mongoose"
 
-const NewsSchema = new Schema({
+
+export interface NewsType {
+  title: string
+  link?: string
+  content?: string
+}
+
+
+const NewsSchema = new Schema<NewsType>({
     title: {
       type: String,
       required: true
@@ -12,14 +20,6 @@ const NewsSchema = new Schema({
     content: {
       type: String,
       required: false
-    },
-    createdAt: {
-      type: String,
-      required: true
-    },
-    updatedAt: {
-      type: String,
-      required: true
     }
   },
   {
@@ -72,4 +72,6 @@ const NewsSchema = new Schema({
 
 
 const News = mongoose.model("News", NewsSchema)
+
+
 export default News

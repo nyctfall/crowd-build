@@ -1,0 +1,13 @@
+// loading page spinner center of screen
+#center {
+  // make the spinner a circle
+  --bs-text-opacity: 0.2;
+  $size: min(min(90vw, 90vh), 200px);
+  width: $size;
+  height: $size;
+  position: absolute;
+  top: calc(50% - ($size / 2));
+  left: calc(50% - ($size / 2));
+  border-width: min(min(10vw, 10vh), 20px);
+  z-index: 1023;
+}

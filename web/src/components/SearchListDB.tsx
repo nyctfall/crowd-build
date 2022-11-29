@@ -7,7 +7,7 @@ import CopyListButton from "./CopyListButton"
 import useCacheList from "../hooks/useCacheList"
 import PCPartId from "./PCPartId"
 import PCPartListId from "./PCPartLIstId"
-import { dbgLog } from "../../types/api"
+import { dbgLog } from "~types/api"
 
 
 /**

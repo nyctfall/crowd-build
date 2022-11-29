@@ -1,5 +1,5 @@
 import { Button, Spinner } from "react-bootstrap"
-import { dbgLog } from "../../types/api"
+import { dbgLog } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { usePostLogoutMutation } from "../redux-stuff/query"
 import { sessionLogout } from "../redux-stuff/reducers/session"

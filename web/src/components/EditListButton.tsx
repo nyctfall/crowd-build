@@ -3,7 +3,7 @@ import { Button, Spinner } from "react-bootstrap"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { usePatchListMutation } from "../redux-stuff/query"
 import { updateList } from "../redux-stuff/reducers/allLists"
-import { dbgLog, ModifyResponce, PCPartInfo, SessionType } from "../../types/api"
+import { dbgLog, ModifyResponce, PCPartInfo, SessionType } from "~types/api"
 
 
 /** 

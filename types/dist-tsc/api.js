@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.filterDB = exports.PCPartSearchURI = exports.typeFilterBuilder = exports.oemFilterBuilder = exports.idFilterBuilder = exports.PCPartType = exports.dbgLog = void 0;
+exports.filterDB = exports.PCPartSearchURI = exports.typeFilterBuilder = exports.oemFilterBuilder = exports.idFilterBuilder = exports.PCPartType = exports.dbgLog = exports.dbgFileLogger = void 0;
 const big_js_1 = __importDefault(require("big.js"));
 const array_type_1 = require("./array-type");
 const dbgLog = (file, trace, ...logs) => {
@@ -17,6 +17,19 @@ const dbgLog = (file, trace, ...logs) => {
     }
 };
 exports.dbgLog = dbgLog;
+const dbgFileLogger = (file) => {
+    const fileFn = (...args) => dbgLog(file, ...args);
+    fileFn.file = file;
+    fileFn.stackLogger = (trace) => {
+        const stackFn = (...logs) => fileFn(trace, ...logs);
+        stackFn.file = fileFn.file;
+        stackFn.trace = trace;
+        return stackFn;
+    };
+    return fileFn;
+};
+exports.dbgFileLogger = dbgFileLogger;
+dbgLog.fileLogger = exports.dbgFileLogger;
 var PCPartType;
 (function (PCPartType) {
     PCPartType["CPU"] = "CPU";
@@ -64,7 +77,7 @@ class PCPartSearchURI {
             this.minPriceFilter = config.minPrice;
         if (config.maxPrice)
             this.maxPriceFilter = config.maxPrice;
-        (0, exports.dbgLog)("api.ts", ["class PCPartSearchURI", "constructor"], "this", this, "config", config);
+        dbgLog("api.ts", ["class PCPartSearchURI", "constructor"], "this", this, "config", config);
     }
     set minPriceFilter(newValue) {
         if (newValue === undefined)
@@ -106,7 +119,7 @@ class PCPartSearchURI {
         if (this.#oemFilter.length > 0)
             this.#oemFilter.forEach(oem => params.push(["oems", oem]));
         const query = new URLSearchParams(params);
-        (0, exports.dbgLog)("api.ts", ["class PCPartSearchURI", "toURI"], "query", query, "params", params);
+        dbgLog("api.ts", ["class PCPartSearchURI", "toURI"], "query", query, "params", params);
         return query;
     }
     toURIEncoded() {
@@ -122,12 +135,12 @@ class PCPartSearchURI {
         if (this.#oemFilter.length > 0)
             this.#oemFilter.forEach(oem => params.push(["oems", encodeURIComponent(oem)]));
         const query = new URLSearchParams(params);
-        (0, exports.dbgLog)("api.ts", ["class PCPartSearchURI", "toURI"], "query", query, "params", params, "this", this);
+        dbgLog("api.ts", ["class PCPartSearchURI", "toURI"], "query", query, "params", params, "this", this);
         return query;
     }
     toString() {
         const queryString = this.toURI().toString();
-        (0, exports.dbgLog)("api.ts", ["class PCPartSearchURI", "toString"], "queryString", queryString, "this", this);
+        dbgLog("api.ts", ["class PCPartSearchURI", "toString"], "queryString", queryString, "this", this);
         return queryString;
     }
 }

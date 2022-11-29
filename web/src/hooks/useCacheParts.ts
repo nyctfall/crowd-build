@@ -1,6 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/dist/query"
 import { useEffect, useState } from "react"
-import { dbgLog, PCPartInfo } from "../../types/api"
+import { dbgLog, PCPartInfo } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useFetchPartsQuery } from "../redux-stuff/query"
 import { addManyParts } from "../redux-stuff/reducers/partsDB"

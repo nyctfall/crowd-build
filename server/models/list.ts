@@ -1,5 +1,6 @@
-import mongoose, { Schema, Types } from "mongoose"
-import { PCPartType } from "../../types/api"
+import mongoose, { Types, Schema, Model, Query, Document } from "mongoose"
+import { PCPartType } from "~types/api"
+
 
 export interface ListType {
   parts: Types.ObjectId[] | undefined
@@ -7,7 +8,12 @@ export interface ListType {
 }
 
 
-const ListSchema = new Schema<ListType>({
+export interface ListTypeQueryHelpers {
+  byType(type: PCPartType): Query<any, Document<ListType>> & ListTypeQueryHelpers
+}
+
+
+const ListSchema = new Schema<ListType, Model<ListType, ListTypeQueryHelpers>>({
     parts: {
       type: [Types.ObjectId],
       required: true,
@@ -50,5 +56,7 @@ const ListSchema = new Schema<ListType>({
   }
 )
 
-const List = mongoose.model<ListType>("List", ListSchema)
+const List = mongoose.model<ListType, Model<ListType, ListTypeQueryHelpers>>("List", ListSchema)
+
+
 export default List

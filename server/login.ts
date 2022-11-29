@@ -1,294 +1,450 @@
+import path from "node:path"
 import express from "express"
-import cors from "cors"
+import session from "express-session"
+import mongoStore from "connect-mongo"
+import passport from "passport"
+import passportJWT from "passport-jwt"
 import jwt from "jsonwebtoken"
-// import session from "express-session"
-// import passport from "passport"
-// import { ExtractJwt, Strategy } from "passport-jwt"
+import bcrypt from "bcrypt"
+import { dbgLog, dbgFileLogger, SessionType } from "~types/api"
+import { mongooseConnection, mongooseConnectPromise } from "./database"
 import Users, { UserType } from "./models/user"
 import Lists from "./models/list"
-import { mongoDBReady } from "./database"
-import { dbgLog, SessionType } from "../types/api"
+
+
+// add custom prop types
+declare module "express-session" {
+  interface SessionData {
+    token: string;
+  }
+}
+declare global {
+  namespace Express {
+    interface User extends InstanceType<typeof Users> {}
+  }
+}
 
 /**
  * @file Handles user account sign-in.
  */
 
+
+/**
+ * Login hanlding Express Router, has session and JWT middleware.
+ */
 const login = express.Router()
 
-// server port, MongoDB db server URI, Redis cache/db server URI:
-const { PORT = 8080, SECRET = "secret" } = process.env
 
-// CORS headers for dev server:
-login.use(cors({
-  origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
+// dbg logger:
+const log = dbgFileLogger("login.ts")
+
+
+/** 
+ * TTL maxAge for JWT, sessions, and cookies in ms, 10 min.
+ */ 
+const maxAge = 1000 * 60 * 10
+
+
+// SECRET should be defined in "(PROJECT_ROOT)/.env":
+const { SECRET = "" } = process.env
+
+
+// debug message for missing .env file or definition of SECRET:
+if (!SECRET) console.error(`\n\tERROR! Error: SECRET should be defined in (PROJECT_ROOT)/.env,\n\tmissing: "${path.resolve(__dirname, "../.env").repeat(10)}"`)
+
+
+/**
+ * mongoDB store for express session:
+ */
+const store = mongoStore.create({
+  client: mongooseConnection.getClient(),
+  // cookie expiration in ms:
+  ttl: maxAge,
+  // remove sessions every min:
+  autoRemoveInterval: 1
+})
+
+// // event listeners for debug:
+store.on("set", (sessionId, session) => log("mongoStore.on(\"set\")", "sessionId", sessionId, "session", session))
+store.on("touch", (sessionId, session) => log("mongoStore.on(\"touch\")", "sessionId", sessionId, "session", session))
+store.on("create", (sessionId, session) => log("mongoStore.on(\"create\")", "sessionId", sessionId, "session", session))
+store.on("update", (sessionId, session) => log("mongoStore.on(\"update\")", "sessionId", sessionId, "session", session))
+store.on("destroy", (sessionId, session) => log("mongoStore.on(\"destroy\")", "sessionId", sessionId, "session", session))
+
+
+/** 
+ * Express server-side session middleware. 
+ */ 
+const loginSession = session({
+  store,
+  secret: SECRET,
+  resave: false,
+  saveUninitialized: true, // if true, this website uses cookies...
+  name: "connect.sid",
+  // use for re-setting the cookie and maxAge every respone:
+  // rolling: true,
+  cookie: {
+    // client side JS should be able to access session cookie:
+    httpOnly: false,
+    // in production only use cookie with HTTPS:
+    // secure: true,
+    // TTL for the cookie on client, for sessoin expiration after time in ms, can be reset using session.touch(newMaxAge):
+    maxAge
+  }
+})
+
+login.use(loginSession)
+
+/** 
+ * Passport initializer Express middleware.
+ */ 
+const passportInit = passport.initialize({
+  userProperty: "user"
+})
+
+login.use(passportInit)
+
+/** 
+ * Passport Express session authentication strategy Express middleware.
+ */
+const passportSession = passport.session()
+
+login.use(passportSession)
+
+
+/** 
+ * JWT token extractor from a Cookie:
+ */
+const cookieExtractor: passportJWT.JwtFromRequestFunction = req => {  
+  // search request cookies for token:
+  if (req && req.cookies && typeof req.cookies.jwt === "string") return req.cookies.jwt
+  
+  // jwt token is null if not in cookie:
+  return null
+}
+
+// use JWT stategy in passport:
+passport.use("jwt", new passportJWT.Strategy({
+    secretOrKey: SECRET,
+    jsonWebTokenOptions: {
+      // TTL in ms:
+      maxAge
+    },
+    jwtFromRequest: passportJWT.ExtractJwt.fromExtractors([passportJWT.ExtractJwt.fromAuthHeaderAsBearerToken(), cookieExtractor])
+  }, 
+  async (jwtPayload: jwt.JwtPayload, done: passportJWT.VerifiedCallback) => {
+    try {
+      const Log = log.stackLogger(["passport.use", "passportJWT.Strategy", `VerifyCallback(${jwtPayload})`])
+      
+      Log("jwtPayload", jwtPayload)
+
+      // find user:
+      const user = await Users.findOne({ _id: jwtPayload.id }).exec()
+
+      Log("user", user)
+      
+      // user found:
+      if (user) done(null, user)
+      // user doesn't exist:
+      else done(null, false)
+    } catch (err){
+      console.error(err)
+
+      // error finding user:
+      done(err, false)
+    }
 }))
 
-// for parsing application/json
-login.use(express.json())
-// for parsing application/x-www-form-urlencoded
-login.use(express.urlencoded({ extended: true }))
 
-// user session:
-// login.use(session({
-//   secret: SECRET,
-//   resave: true,
-//   saveUninitialized: true
-// }))
+// serialize user to express session:
+passport.serializeUser(async (user, done) => {
+  done(null, (user as any)?.id)
+})
+  
+// deserialize user from express session:
+passport.deserializeUser(async (id: string, done) => {
+  try {
+    const Log = log.stackLogger("passport.deserializeUser")
+    
+    Log("id", id)
 
-// passport init:
-// login.use(passport.initialize())
-// login.use(passport.session())
-// passport.use(new Strategy({ secretOrKey: SECRET, jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken() }, (jwt, done) => {
-//   /** @todo */
-// }))
+    // parse json, will throw if undefined:
+    const user = await Users.findById(id).exec()
+    
+    Log("id", id, "user", user)
+    
+    // user should be an object, and not null:
+    if (user) done(null, user)
+    else done(null, false)
+  } catch (err){
+    console.error(err)
 
-/*
-// no db available, cannot function:
-login.use(["/api/v1/profile", "/api/v1/profile/*", "/api/v1/login", "/api/v1/signup", "/api/v1/logout"], (req, res, next) => {
-  res.sendStatus(503)
+    done(err, false)
+  }
+})
+
+
+// logging middleware:
+login.use((req, _res, next) => {
+  log("login.use",
+    "req.account", (req as any).account, 
+    "req.user", req.user, 
+    "req.authInfo", req.authInfo,
+    "req.sessionID", req.sessionID, 
+    "req.session", req.session,
+    "req.isAuthenticated?.()", req.isAuthenticated?.(),
+    "req.isUnauthenticated?.()", req.isUnauthenticated?.(),
+    "req.sessionStore", req.sessionStore, 
+  )
+  
   next()
-}) 
-*/
+})
+
 
 // requires db:
-mongoDBReady.then(() => {
+mongooseConnectPromise
+.then(() => {
   console.log("\n\t> Login Session ready...")
 
-  /** @todo better handling of log out invalidating JWT tokens, and redis store... */
-  const validTokens: Set<string> = new Set()
 
-  // promisified jwt.verify():
-  const jwtVerifyPromise = (token: string, SECRET: jwt.Secret) => new Promise((resolve, reject) => 
-    jwt.verify(token, SECRET, (err, decodedJWT) => err ? reject(err) : resolve(decodedJWT))
-  )
-  
-  // consistant jwt signing config:
+  // jwt signing helper:
   const jwtSign = (payload: jwt.JwtPayload) => new Promise<string>((resolve, reject) => 
-    jwt.sign(payload, SECRET, { expiresIn: "5m" }, (err, token) => err ? reject(err) : resolve(token as string))
+    jwt.sign(
+      payload, 
+      SECRET, 
+      { expiresIn: maxAge }, 
+      (err, token) => err ? reject(err) : resolve(token as string)
+    )
   )
   
-  /** @todo IMPORTANT: bcrypt password for security! */
-  login.post("/api/v1/login", async (req, res) => {
+
+  // login route, also logs-in for passport:
+  login.post("/login", passport.authenticate("jwt", { successRedirect: "/api/v1/profile", session: true }), async (req, res) => {
     try {
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.post('/login')"])
+
       const { username, password } = req.body
       
+
+      Log("username", username, "password", password)
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/login\")"], "username", username, "password", password, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-      
-      
+
       // look for existing user:
       const user = await Users.findOne({ username }).exec()
       
+
+      Log("user", user)
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/login\")"], "user", user)
-      
-      
+
       // return and send responce of not found user:
       /** @todo improve api responces for incorrect data request. edit of front-end required */
-      if (!user){
-        res/* .status(404) */.json({ success: false, nonexistant: true } as SessionType)
-        return
-      }
+      if (!user) return res.status(404).json({ 
+        success: false, 
+        nonexistant: true 
+      } as SessionType)
+
 
       // return and send responce of wrong password to user:
-      /** 
-       * @todo IMPORTANT: bcrypt password for security!
-       * @todo improve api responces for incorrect data request. edit of front-end required 
-       */
-      if (password !== user.password){
-        res/* .status(401) */.json({ success: false, conflict: true, incorrect: ["password"] } as SessionType)
-        return
-      }
+      /** @todo improve api responces for incorrect data request. edit of front-end required */
+      if (await bcrypt.compare(password, user.password)) return res.status(401).json({ 
+        success: false, 
+        conflict: true, 
+        incorrect: ["password"] 
+      } as SessionType)
       
       // signin JWT token:
       const token = await jwtSign({ id: user.id, username: user.username })
       
       // add to valid array to make sign out work:
-      validTokens.add(token)
+      req.session.token = token
       
+
+      Log("token", token, "req.session.token", req.session.token)
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/login\")"], "token", token, "validTokens", validTokens, "user", user)
-      
-      
+
       // respond with success:
-      res.json({ success: true, user, token } as Omit<SessionType, "user"> & {user:UserType})
+      res.json({ 
+        success: true, 
+        user, 
+        token 
+      } as { user: UserType } & Omit<SessionType, "user">)
+
+
+      // start session:
+      req.login(user, { session: true }, (err) => {
+        console.error(err)
+      })
     } catch (e){
       console.error(e)
       
+      // bad request:
       res.sendStatus(400)
     }
   })
 
-  /** @todo IMPORTANT: bcrypt password for security! */
-  login.post("/api/v1/signup", async (req, res) => {
+
+  // signup route, creates user in db, also logs-in for passport:
+  login.post("/signup", passport.authenticate("jwt", { successRedirect: "/api/v1/profile", session: true }), async (req, res) => {
     try {
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.post('/signup')"])
+      
       const { username, password } = req.body
 
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/signup\")"], "username", username, "password", password, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+      Log("username", username, "password", password)
       
-      
+
       // check for pre-existing user name:
       const userTaken = await Users.find({ username }).exec()
       
+
+      Log("userTaken", userTaken)
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/signup\")"], "userTaken", userTaken)
-      
-      
+
       // return and send responce of problem to user:
       /** @todo improve api responces for incorrect data request. edit of front-end required */
       if (userTaken.length > 0){
-        res/* .status(409) */.json({ success: false, conflict: true, preexisting: ["username"] } as SessionType)
+        res.status(409).json({ success: false, conflict: true, preexisting: ["username"] } as SessionType)
         return
       }
       
       // create new user:
-      /** @todo IMPORTANT: bcrypt password for security! */
-      const newUser = new Users({ username, password })
+      const newUser = await new Users({ 
+        username, 
+        password: await bcrypt.hash(password, 10)
+      }).save()
       
+
+      Log("newUser", newUser)
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/signup\")"], "newUser", newUser)
-      
-      
-      // save user:
-      await newUser.save()
-      
+
       // signin JWT token:
       const token = await jwtSign({ id: newUser.id, username: newUser.username })
       
       // add to valid array to make sign out work:
-      validTokens.add(token)
+      req.session.token = token
       
-      
-      dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/signup\")"], "token", token, "valvalidTokens", validTokens)
-      
+
+      Log("token", token, "req.session.token", req.session.token)
+
 
       // respond with success:
       res.json({ success: true, user: newUser.toObject(), token } as SessionType)
+
+      // start session:
+      req.login(newUser, { session: true }, (err) => {
+        console.error(err)
+      })
     } catch (e){
       console.error(e)
       
+      // bad request:
       res.sendStatus(400)
     }
   })
 
-  login.post("/api/v1/logout", async (req, res) => {
-    dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/logout\")"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user, "req.headers", req.headers)
+
+  login.post("/logout", passport.authenticate("jwt", { session: true }), async (req, res) => {
+    try {
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.post('/logout')"])
       
-    
-    const tokenToInvalidate = req.headers.authorization?.split(' ')[1]
+        
+      Log("req.session", req.session, "req.session.token", req.session.token)
+      
+  
+      // // invalidating the session:
+      // req.session.destroy((err) => {
+      //   if (err){
+      //     console.error(err)
+          
+      //     // token was not deleted:
+      //     res.status(500).send({ success: false } as SessionType)
+      //   }
 
+      // logout user:
+      req.logout((err) => {
+        if (err){
+          console.error(err)
+          
+          // token was not deleted:
+          res.status(500).send({ success: false } as SessionType)
+        }
 
-    dbgLog("login.ts", ["mongoDBReady.then","login.post(\"/api/v1/logout\")"], "tokenToInvalidate", tokenToInvalidate)
-    
-    
-    // invalidating the token:
-    if (tokenToInvalidate && validTokens.has(tokenToInvalidate) && !validTokens.delete(tokenToInvalidate) && validTokens.has(tokenToInvalidate)){
+        // token was successfully invalidated, didn't exist, or was alredy invalid:
+        res.send({ success: true } as SessionType)
+      })
+      // })
+    } catch (err){
+      console.error(err)
+
       // token was not deleted:
       res.status(500).send({ success: false } as SessionType)
-      return
-    }
-    
-    // token was successfully invalidated, didn't exist, or was alredy invalid:
-    res.send({ success: true } as SessionType)
-  })
-
-  // user profile page:
-  login.use(["/api/v1/profile", "/api/v1/profile/*"], async (req, res, next) => {
-    dbgLog("login.ts", ["mongoDBReady.then","login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "req.path", req.path, "request.headers", req.headers, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
-    
-    
-    // Authorization: 'Bearer TOKEN':
-    const token = req.headers.authorization?.split(' ')[1]
-    
-
-    try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token)
-      
-      
-      // check token:
-      if (!token || !validTokens.has(token)){
-        // redirect to login when not logged in:
-        res.status(401).redirect("/api/v1/login")
-        return
-      }
-      
-      // Decoding the token:
-      const decodedToken = await jwtVerifyPromise(token, SECRET)
-      
-      // add user prop to request using this middleware:
-      req.user = decodedToken as jwt.JwtPayload
-      (req as any)._jwtToken = token
-      
-
-      dbgLog("login.ts", ["mongoDBReady.then","login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token, "decodedToken", decodedToken, "req.user", req.user)
-      
-      
-      // send page:
-      next()
-    } catch (e){
-      console.error(e)
-      
-      // remove expired token from valid tokens:
-      if (token) validTokens.delete(token)
-      
-      dbgLog("login.ts", ["mongoDBReady.then","login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token, "validTokens", validTokens, "req.user", req.user)
-      
-      // redirect to login when not logged in:
-      res/* .status(401) */.redirect("/api/v1/login")
     }
   })
+
+
+  // check login for auth to use user profile:
+  login.use(["/profile", "/profile/*"], passport.authenticate("jwt", { 
+    session: true,
+    failureRedirect: "/api/v1/login"
+  }))
   
-  login.route("/api/v1/profile/lists")
+
+  login.route("/profile/lists")
   // get all user owned lists:
   .get(async (req, res) => {
     // send all lists owned by user:
     try {
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile/lists').get"])
+      
       // skip certain number of newest stories:
       const offset = Number(req.query.offset ?? 0)
+      
       // only get limited number of stories:
       const limit = Number(req.query.limit ?? 1)
 
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      Log("offset", offset, "limit", limit)
       
 
-      const dbRes = await Lists.find({ user: (req.user as jwt.JwtPayload)?.id }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
+      // get users lists:
+      const dbRes = await Lists.find({ user: req.user?.id }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
 
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").get"], "dbRes", dbRes)
+      Log("dbRes", dbRes)
       
 
       if (dbRes != null) res.json(dbRes)
+      // bad request:
       else res.sendStatus(404)
     } catch (e) {
       console.error(e)
       
+      // bad request:
       res.sendStatus(400)
     }
   })
   // save a user specific list:
   .post(async (req, res) => {
     try {
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile/lists').post"])
+
       // save new list:
-      const newList = await new Lists({ parts: req.body.parts, user: (req.user as jwt.JwtPayload)?.id }).save()
+      const newList = await new Lists({ parts: req.body.parts, user: req.user?.id }).save()
       
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").post"], "newList", newList, "logged in user", req.user, "req.body", req.body, "req.params", req.params, "req.query", req.query)
+      Log("newList", newList)
       
 
       // save list id to user:
-      const user = await Users.findById((req.user as jwt.JwtPayload)?.id).exec()
+      const user = await Users.findById(req.user?.id).exec()
       
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").post"], "mongo user before", user?.toJSON())
+      Log("mongo user before", user?.toJSON())
       
-
+      
       // don't save to user if user was not found:
-      if (!user) {
-        res.json(newList)
-        return
-      }
+      if (!user) return res.json(newList)
       // if (!user) {
       //   res.sendStatus(400)
       //   return
@@ -298,12 +454,13 @@ mongoDBReady.then(() => {
       if (user.lists) user.lists.push(newList.id)
       else user.lists = [newList.id]
       
+      
       // save to db:
       await user.save()
 
       
       // // return all info from updated user:
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").post"], "mongo user after", (await user.populate("lists")).toJSON())
+      Log("mongo user after", (await user.populate("lists")).toJSON())
       
 
       // // return user with added list:
@@ -313,10 +470,13 @@ mongoDBReady.then(() => {
       //   res.json(user.lists)
       //   await user.populate("lists")
       // }
+
+      // bad request:
       else res.sendStatus(400)
     } catch (e){
       console.error(e)
       
+      // bad request:
       res.sendStatus(400)
     }
   })
@@ -324,45 +484,60 @@ mongoDBReady.then(() => {
   .delete(async (req, res) => {
     // only delete all lists owned by user:
     try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile/lists').delete"])
       
 
-      const dbRes = await Lists.deleteMany({ user: (req.user as jwt.JwtPayload)?.id }).exec()
+      // delete user's lists:
+      const dbRes = await Lists.deleteMany({ user: req.user?.id }).exec()
 
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      Log("dbRes", dbRes)
 
 
       if (dbRes != null) res.json(dbRes)
+      // bad request:
       else res.sendStatus(400)
     } catch (e) {
       console.error(e)
 
+      // bad request:
       res.sendStatus(400)
     }
   })
 
+
   // modify user specific lists:
-  login.route("/api/v1/profile/lists/id/:id")
+  login.route("/profile/lists/id/:id")
   .patch(async (req, res) => {
     // only edit lists not owned by user:
     try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists/id/:id\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile/lists/id/:id').patch"])
       
 
+      Log("req.params", req.params, "req.user", req.user)
+
+
       /** @todo improve handling for missing list. */
-      const dbRes = await Lists.updateOne({ _id: req.params.id, user: (req.user as jwt.JwtPayload)?.id }, { $set: { parts: req.body.parts } }).exec()
+      const dbRes = await Lists.updateOne({ 
+          _id: req.params.id, user: req.user?.id 
+        }, 
+        { 
+          $set: { parts: req.body.parts } 
+        }
+      ).exec()
       // else res.sendStatus(404)
       
 
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists/id/:id\").patch"], "req.path", req.path, "dbRes", dbRes)
+      Log("dbRes", dbRes)
 
 
       if (dbRes != null) res.json(dbRes)
+      // bad request:
       else res.sendStatus(400)
     } catch (e) {
       console.error(e)
 
+      // bad request:
       res.sendStatus(400)
     }
   })
@@ -370,10 +545,17 @@ mongoDBReady.then(() => {
   .delete(async (req, res) => {
     // only delete list owned by user:
     try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile/lists/id/:id').delete"])
       
       
-      const dbUserRes = await Users.findById((req.user as jwt.JwtPayload)?.id).exec()
+      Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
+      
+      
+      const dbUserRes = await Users.findById(req.user?.id).exec()
+      
+      
+      Log("dbUserRes before", dbUserRes)
+      
       
       // remove deleted list from user lists:
       /** @todo improve handling for missing user, when deleted in another session. */
@@ -384,109 +566,129 @@ mongoDBReady.then(() => {
         dbUserRes.save()
         
         
-        dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "dbUserRes", dbUserRes)
+        Log("dbUserRes after", dbUserRes)
       }
       // if (dbUser == null) {
       //   const dbListDisownRes = await Lists.modifyOne(
-      //     { _id: req.params.id, user: (req.user as jwt.JwtPayload)?.id }, 
+      //     { _id: req.params.id, user: req.user?.id }, 
       //     { $unset: "user" }
       //   ).exec()
       //   res.status(404).json({ user: dbUser, list: dbListDisownRes })
       // }
 
       /** @todo improve handling for missing list. */
-      const dbListRes = await Lists.deleteOne({ _id: req.params.id, user: (req.user as jwt.JwtPayload)?.id }).exec()
+      const dbListRes = await Lists.deleteOne({ _id: req.params.id, user: req.user?.id }).exec()
       // else res.sendStatus(404)
       
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "dbListRes", dbListRes)
+      Log("dbListRes", dbListRes)
 
 
       if (dbListRes != null) res.json(dbListRes)
+      // bad request:
       else res.sendStatus(400)
     } catch (e) {
       console.error(e)
 
+      // bad request:
       res.sendStatus(400)
     }
   })
 
-  login.route("/api/v1/profile")
+
+  // edit user profile settings:
+  login.route("/profile")
   // edit user:
   .patch(async (req, res) => {
     // note: mongoose only supports limited validation using find and update
     try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile').patch"])
+      
+      
+      Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
       
       
       /** @todo improve handling for missing user, when deleted in another session. */
       /** @todo improve handling for errors. */
-      const dbRes = await Users.updateOne({ _id: (req.user as jwt.JwtPayload)?.id }, { $set: { username: req.body.username } }).exec()
+      const dbRes = await Users.updateOne({ 
+          _id: req.user?.id 
+        }, 
+        { 
+          $set: { username: req.body.username } 
+        }
+      ).exec()
       // else res.sendStatus(404)
       
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").patch"], "dbRes", dbRes)
+      Log("dbRes", dbRes)
 
       
       if (dbRes) res.json(dbRes)
+      // bad request:
       else res.sendStatus(400)
     } catch (e){
       console.error(e)
       
+      // bad request:
       res.sendStatus(400)
     }
   })
   // delete user and all user owned lists:
   .delete(async (req, res) => {
     try {
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user)
+      const Log = log.stackLogger(["mongooseConnectPromise.then","login.route('/profile').delete"])
+      
+      
+      Log("req.user", req.user)
       
       
       // all user owned lists:
-      const dbListRes = await Lists.deleteMany({ user: (req.user as jwt.JwtPayload)?.id }).exec()
+      const dbListRes = await Lists.deleteMany({ user: req.user?.id }).exec()
       
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").delete"], "dbListRes", dbListRes)
+      Log("dbListRes", dbListRes)
       
       
       /** @todo improve handling for missing user, when deleted in another session. */
       /** @todo improve handling for errors. */
       // delete user:
-      const dbUserRes = await Users.deleteOne({ _id: (req.user as jwt.JwtPayload)?.id }).exec()
+      const dbUserRes = await Users.deleteOne({ _id: req.user?.id }).exec()
       
       
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").delete"], "dbUserRes", dbUserRes)
+      Log("dbUserRes", dbUserRes)
       
       
+      // return successful deletion:
       res.json(dbUserRes)
       
-      // log out user that no longer exists:
-      validTokens.delete((req as any)._jwtToken)
-      
-      // log out any other sessions:
-      validTokens.forEach((token) => {
-        let jwtSession
-        
-        try {
-          // will throw error if expired:
-          jwtSession = jwt.decode(token)
-        } catch (e){
-          console.error(e)
-        }
-        
-        dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").delete","validTokens.forEach"], "token", token, "jwtSession", jwtSession, "req._jwtToken", (req as any)._jwtToken, "validTokens", validTokens)
-        
-        if (jwtSession && typeof jwtSession === "object" && typeof jwtSession.id === "string" && jwtSession.id === (req.user as jwt.JwtPayload)?.id) validTokens.delete(token)
+      /** @todo log out any other sessions. */
+      req.logout({ keepSessionInfo: false }, (err) => {
+        console.error(err)
       })
-      
-
-      dbgLog("login.ts", ["mongoDBReady.then","login.route(\"/api/v1/profile\").delete"], "req._jwtToken", (req as any)._jwtToken, "validTokens", validTokens)
     } catch (e){
       console.error(e)
 
+      // bad request:
       res.sendStatus(400)
     }
   })
 })
+.catch((reason) => {
+  console.error(`\n\tERROR!:\n${reason}`)
 
-export { login }
+
+  // no mongoDB available, cannot process logins:
+  login.use((_req, res) => {
+    console.error(`\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20))
+    
+    res.sendStatus(503)
+  })
+})
+
+
+export { 
+  login, 
+  loginSession,
+  passportInit,
+  passportSession
+}

@@ -1,24 +1,31 @@
 import { Container, Nav, Navbar, NavDropdown, Row } from "react-bootstrap"
+import reactLogo from "../assets/react.svg"
 import { LinkContainer } from "react-router-bootstrap"
 import { useAppSelector } from "../redux-stuff/hooks"
 import LogOutButton from "./Logout"
-import reactLogo from "../assets/react.svg"
-import "../styles/NavBar.scss"
+import { useLocation } from "react-router-dom"
 
 
 /**
  * Nav bar.
+ * @todo location based display of nested dropdown links to ButtonGroup of current link and dropdown to other nested links.
+ * @todo expand all dropdowns for collapsable nav for small screens, and make nav full height on small screens.
  */
 function NavBar(){
   // user login state:
   const { isLoggedIn, user } = useAppSelector(state => state.session)
+
+  // route path for dynamic nav:
+  const loc = useLocation()
   
   
   return (
     <Navbar as="header" sticky="top" bg="dark" variant="dark" expand="md" collapseOnSelect className="text-bg-dark">
-      <Container as="nav" fluid>
+      <Container as="nav" fluid id="navbar-flex">
+        <Navbar.Toggle aria-controls="navbar-nav" />
+        
         <LinkContainer to="/">
-          <Navbar.Brand>
+          <Navbar.Brand id="nav-logo-brand">
             <img 
               src={reactLogo}
               id="company-logo"
@@ -30,8 +37,6 @@ function NavBar(){
             <span id="company-logo-name">CrowdBuild</span>
           </Navbar.Brand>
         </LinkContainer>
-        
-        <Navbar.Toggle aria-controls="navbar-nav" />
         
         <Navbar.Collapse id="navbar-nav">
           <Nav as="ul" navbarScroll justify defaultActiveKey="/"  style={{ maxHeight: "max(20vh, 10vw)" }} className="w-100 me-auto">

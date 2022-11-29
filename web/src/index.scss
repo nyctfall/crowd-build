@@ -1,6 +1,11 @@
-// Import all of Bootstrap's CSS
+// import all of Bootstrap's CSS
 @use "~bootstrap/scss/bootstrap.scss";
-
+// component styles:
+@use "./styles/App";
+@use "./styles/Home";
+@use "./styles/NavBar";
+@use "./styles/SearchPart";
+@use "./styles/Chunker";
 
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
@@ -13,8 +18,4 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-}
-
-body {
-  margin: 0;
 }

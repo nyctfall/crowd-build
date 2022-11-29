@@ -1,71 +1,106 @@
+import { lazy } from "react"
+import { Routes, Route, Navigate } from "react-router-dom"
 import "vite/modulepreload-polyfill"
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
-import { Routes, Route, Navigate } from "react-router-dom"
-import "./styles/App.scss"
+import { dbgLog } from "~types/api"
 import NavBar from "./components/NavBar"
 import Footer from "./components/Footer"
-import Root from "./pages/Root"
-import Home from "./pages/Home"
-import News from "./pages/News"
-import Tests from "./pages/Tests"
-import Forum from "./pages/Forum"
-import MyList from "./pages/MyList"
-import Signup from "./pages/Signup"
-import Signin from "./pages/Signin"
-import Reviews from "./pages/Reviews"
-import Database from "./pages/Database"
-import NotFound from "./pages/NotFound"
-import Benchmarks from "./pages/Benchmarks"
-import Profile from "./pages/Profile"
+import Chunker from "./components/Chunker"
 import { useAppSelector } from "./redux-stuff/hooks"
-import { dbgLog } from "../types/api"
 
+
+// dynamic imports for rollup to make automatic chunks:
+const Root = lazy(() => import("./pages/Root"))
+const Home = lazy(() => import("./pages/Home"))
+const News = lazy(() => import("./pages/News"))
+const Tests = lazy(() => import("./pages/Tests"))
+const Forum = lazy(() => import("./pages/Forum"))
+const MyList = lazy(() => import("./pages/MyList"))
+const Signup = lazy(() => import("./pages/Signup"))
+const Signin = lazy(() => import("./pages/Signin"))
+const Reviews = lazy(() => import("./pages/Reviews"))
+const Profile = lazy(() => import("./pages/Profile"))
+const Database = lazy(() => import("./pages/Database"))
+const NotFound = lazy(() => import("./pages/NotFound"))
+const Benchmarks = lazy(() => import("./pages/Benchmarks"))
+
+
+// mapping of lazy loaded component/chunk to route path.
+const chunkRoutes: [React.LazyExoticComponent<() => JSX.Element>, string][] = [
+  [Root, "/"],
+  [Home, "/home"],
+  [News, "/news"],
+  [Tests, "/tests"],
+  [Forum, "/forum"],
+  [MyList, "/my-list"],
+  [Signup, "/signup"],
+  [Signin, "/signin"],
+  [Reviews, "/reviews"],
+  [Profile, "/profile"],
+  [Database, "/database"],
+  [Benchmarks, "/benchmarks"],
+  [NotFound, "*"],
+]
 
 /**
- * 
+ * The main App, also has all of the react-router routes.
  */
 function App() {
   // login session state:
   const state = useAppSelector(state => state)
   const { session } = state
-
+  
   
   dbgLog("App.tsx", "App", "state", state)
-
+  
 
   return (
     <>
       <div className="min-vh-100 d-flex flex-column align-items-stretch align-self-stretch align-content-between">
         <NavBar />
-
+        {/** @todo darken during loading */}
         <main className="flex-fill">
           <Routes>
             {session.isLoggedIn ? <>
+                {([[Profile, "/profile"], [Profile, "/profile/*"]] as typeof chunkRoutes)
+                  .map(([Element, path], i) => 
+                    <Route 
+                      key={i} 
+                      path={path} 
+                      element={<Chunker {...{Element}} />} 
+                    />
+                  )
+                }
                 <Route path="/" element={<Navigate to="/profile" />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/*" element={<Profile />} />
                 <Route path="/signup" element={<Navigate to="/profile" />} />
                 <Route path="/signin" element={<Navigate to="/profile" />} />
               </>
               : <>
-                <Route path="/" element={<Root />} />
+                {chunkRoutes
+                  .filter(([Element]) => Element === Signin || Element === Signup || Element === Root)
+                  .map(([Element, path], i) => 
+                    <Route 
+                      key={i} 
+                      path={path} 
+                      element={<Chunker {...{Element}} />} 
+                    />
+                  )
+                }
                 <Route path="/profile" element={<Navigate to="/signin" />} />
                 <Route path="/profile/*" element={<Navigate to="/signin" />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/signin" element={<Signin />} />
               </>
             }
             
-            <Route path="/" element={<Root />} />
-            <Route path="/home" element={<Home />} />
-            <Route path="/news" element={<News />} />
-            <Route path="/forum" element={<Forum />} />
-            <Route path="/tests" element={<Tests />} />
-            <Route path="/my-list" element={<MyList />} />
-            <Route path="/reviews" element={<Reviews />} />
-            <Route path="/database" element={<Database />} />
-            <Route path="/benchmarks" element={<Benchmarks />} />
-            <Route path="*" element={<NotFound />} />
+            {chunkRoutes
+              .filter(([element]) => element !== Signin && element !== Signup && element !== Root && element !== Profile)
+              .map(([Element, path], i) => 
+                <Route 
+                  key={i} 
+                  path={path} 
+                  element={<Chunker {...{Element}} />} 
+                />
+              )
+            }
           </Routes>
         </main>
         

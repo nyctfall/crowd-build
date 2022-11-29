@@ -3,115 +3,205 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.login = void 0;
+exports.passportSession = exports.passportInit = exports.loginSession = exports.login = void 0;
+const node_path_1 = __importDefault(require("node:path"));
 const express_1 = __importDefault(require("express"));
-const cors_1 = __importDefault(require("cors"));
+const express_session_1 = __importDefault(require("express-session"));
+const connect_mongo_1 = __importDefault(require("connect-mongo"));
+const passport_1 = __importDefault(require("passport"));
+const passport_jwt_1 = __importDefault(require("passport-jwt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const api_1 = require("~types/api");
+const database_1 = require("./database");
 const user_1 = __importDefault(require("./models/user"));
 const list_1 = __importDefault(require("./models/list"));
-const database_1 = require("./database");
-const api_1 = require("../types/api");
 const login = express_1.default.Router();
 exports.login = login;
-const { PORT = 8080, SECRET = "secret" } = process.env;
-login.use((0, cors_1.default)({
-    origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
+const log = (0, api_1.dbgFileLogger)("login.ts");
+const maxAge = 1000 * 60 * 10;
+const { SECRET = "" } = process.env;
+if (!SECRET)
+    console.error(`\n\tERROR! Error: SECRET should be defined in (PROJECT_ROOT)/.env,\n\tmissing: "${node_path_1.default.resolve(__dirname, "../.env").repeat(10)}"`);
+const store = connect_mongo_1.default.create({
+    client: database_1.mongooseConnection.getClient(),
+    ttl: maxAge,
+    autoRemoveInterval: 1
+});
+store.on("set", (sessionId, session) => log("mongoStore.on(\"set\")", "sessionId", sessionId, "session", session));
+store.on("touch", (sessionId, session) => log("mongoStore.on(\"touch\")", "sessionId", sessionId, "session", session));
+store.on("create", (sessionId, session) => log("mongoStore.on(\"create\")", "sessionId", sessionId, "session", session));
+store.on("update", (sessionId, session) => log("mongoStore.on(\"update\")", "sessionId", sessionId, "session", session));
+store.on("destroy", (sessionId, session) => log("mongoStore.on(\"destroy\")", "sessionId", sessionId, "session", session));
+const loginSession = (0, express_session_1.default)({
+    store,
+    secret: SECRET,
+    resave: false,
+    saveUninitialized: true,
+    name: "connect.sid",
+    cookie: {
+        httpOnly: false,
+        maxAge
+    }
+});
+exports.loginSession = loginSession;
+login.use(loginSession);
+const passportInit = passport_1.default.initialize({
+    userProperty: "user"
+});
+exports.passportInit = passportInit;
+login.use(passportInit);
+const passportSession = passport_1.default.session();
+exports.passportSession = passportSession;
+login.use(passportSession);
+const cookieExtractor = req => {
+    if (req && req.cookies && typeof req.cookies.jwt === "string")
+        return req.cookies.jwt;
+    return null;
+};
+passport_1.default.use("jwt", new passport_jwt_1.default.Strategy({
+    secretOrKey: SECRET,
+    jsonWebTokenOptions: {
+        maxAge
+    },
+    jwtFromRequest: passport_jwt_1.default.ExtractJwt.fromExtractors([passport_jwt_1.default.ExtractJwt.fromAuthHeaderAsBearerToken(), cookieExtractor])
+}, async (jwtPayload, done) => {
+    try {
+        const Log = log.stackLogger(["passport.use", "passportJWT.Strategy", `VerifyCallback(${jwtPayload})`]);
+        Log("jwtPayload", jwtPayload);
+        const user = await user_1.default.findOne({ _id: jwtPayload.id }).exec();
+        Log("user", user);
+        if (user)
+            done(null, user);
+        else
+            done(null, false);
+    }
+    catch (err) {
+        console.error(err);
+        done(err, false);
+    }
 }));
-login.use(express_1.default.json());
-login.use(express_1.default.urlencoded({ extended: true }));
-database_1.mongoDBReady.then(() => {
+passport_1.default.serializeUser(async (user, done) => {
+    done(null, user?.id);
+});
+passport_1.default.deserializeUser(async (id, done) => {
+    try {
+        const Log = log.stackLogger("passport.deserializeUser");
+        Log("id", id);
+        const user = await user_1.default.findById(id).exec();
+        Log("id", id, "user", user);
+        if (user)
+            done(null, user);
+        else
+            done(null, false);
+    }
+    catch (err) {
+        console.error(err);
+        done(err, false);
+    }
+});
+login.use((req, _res, next) => {
+    log("login.use", "req.account", req.account, "req.user", req.user, "req.authInfo", req.authInfo, "req.sessionID", req.sessionID, "req.session", req.session, "req.isAuthenticated?.()", req.isAuthenticated?.(), "req.isUnauthenticated?.()", req.isUnauthenticated?.(), "req.sessionStore", req.sessionStore);
+    next();
+});
+database_1.mongooseConnectPromise
+    .then(() => {
     console.log("\n\t> Login Session ready...");
-    const validTokens = new Set();
-    const jwtVerifyPromise = (token, SECRET) => new Promise((resolve, reject) => jsonwebtoken_1.default.verify(token, SECRET, (err, decodedJWT) => err ? reject(err) : resolve(decodedJWT)));
-    const jwtSign = (payload) => new Promise((resolve, reject) => jsonwebtoken_1.default.sign(payload, SECRET, { expiresIn: "5m" }, (err, token) => err ? reject(err) : resolve(token)));
-    login.post("/api/v1/login", async (req, res) => {
+    const jwtSign = (payload) => new Promise((resolve, reject) => jsonwebtoken_1.default.sign(payload, SECRET, { expiresIn: maxAge }, (err, token) => err ? reject(err) : resolve(token)));
+    login.post("/login", passport_1.default.authenticate("jwt", { successRedirect: "/api/v1/profile", session: true }), async (req, res) => {
         try {
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.post('/login')"]);
             const { username, password } = req.body;
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/login\")"], "username", username, "password", password, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
+            Log("username", username, "password", password);
             const user = await user_1.default.findOne({ username }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/login\")"], "user", user);
-            if (!user) {
-                res.json({ success: false, nonexistant: true });
-                return;
-            }
-            if (password !== user.password) {
-                res.json({ success: false, conflict: true, incorrect: ["password"] });
-                return;
-            }
+            Log("user", user);
+            if (!user)
+                return res.status(404).json({
+                    success: false,
+                    nonexistant: true
+                });
+            if (await bcrypt_1.default.compare(password, user.password))
+                return res.status(401).json({
+                    success: false,
+                    conflict: true,
+                    incorrect: ["password"]
+                });
             const token = await jwtSign({ id: user.id, username: user.username });
-            validTokens.add(token);
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/login\")"], "token", token, "validTokens", validTokens, "user", user);
-            res.json({ success: true, user, token });
+            req.session.token = token;
+            Log("token", token, "req.session.token", req.session.token);
+            res.json({
+                success: true,
+                user,
+                token
+            });
+            req.login(user, { session: true }, (err) => {
+                console.error(err);
+            });
         }
         catch (e) {
             console.error(e);
             res.sendStatus(400);
         }
     });
-    login.post("/api/v1/signup", async (req, res) => {
+    login.post("/signup", passport_1.default.authenticate("jwt", { successRedirect: "/api/v1/profile", session: true }), async (req, res) => {
         try {
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.post('/signup')"]);
             const { username, password } = req.body;
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/signup\")"], "username", username, "password", password, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
+            Log("username", username, "password", password);
             const userTaken = await user_1.default.find({ username }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/signup\")"], "userTaken", userTaken);
+            Log("userTaken", userTaken);
             if (userTaken.length > 0) {
-                res.json({ success: false, conflict: true, preexisting: ["username"] });
+                res.status(409).json({ success: false, conflict: true, preexisting: ["username"] });
                 return;
             }
-            const newUser = new user_1.default({ username, password });
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/signup\")"], "newUser", newUser);
-            await newUser.save();
+            const newUser = await new user_1.default({
+                username,
+                password: await bcrypt_1.default.hash(password, 10)
+            }).save();
+            Log("newUser", newUser);
             const token = await jwtSign({ id: newUser.id, username: newUser.username });
-            validTokens.add(token);
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/signup\")"], "token", token, "valvalidTokens", validTokens);
+            req.session.token = token;
+            Log("token", token, "req.session.token", req.session.token);
             res.json({ success: true, user: newUser.toObject(), token });
+            req.login(newUser, { session: true }, (err) => {
+                console.error(err);
+            });
         }
         catch (e) {
             console.error(e);
             res.sendStatus(400);
         }
     });
-    login.post("/api/v1/logout", async (req, res) => {
-        (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/logout\")"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user, "req.headers", req.headers);
-        const tokenToInvalidate = req.headers.authorization?.split(' ')[1];
-        (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.post(\"/api/v1/logout\")"], "tokenToInvalidate", tokenToInvalidate);
-        if (tokenToInvalidate && validTokens.has(tokenToInvalidate) && !validTokens.delete(tokenToInvalidate) && validTokens.has(tokenToInvalidate)) {
-            res.status(500).send({ success: false });
-            return;
-        }
-        res.send({ success: true });
-    });
-    login.use(["/api/v1/profile", "/api/v1/profile/*"], async (req, res, next) => {
-        (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "req.path", req.path, "request.headers", req.headers, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
-        const token = req.headers.authorization?.split(' ')[1];
+    login.post("/logout", passport_1.default.authenticate("jwt", { session: true }), async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token);
-            if (!token || !validTokens.has(token)) {
-                res.status(401).redirect("/api/v1/login");
-                return;
-            }
-            const decodedToken = await jwtVerifyPromise(token, SECRET);
-            req.user = decodedToken;
-            req._jwtToken = token;
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token, "decodedToken", decodedToken, "req.user", req.user);
-            next();
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.post('/logout')"]);
+            Log("req.session", req.session, "req.session.token", req.session.token);
+            req.logout((err) => {
+                if (err) {
+                    console.error(err);
+                    res.status(500).send({ success: false });
+                }
+                res.send({ success: true });
+            });
         }
-        catch (e) {
-            console.error(e);
-            if (token)
-                validTokens.delete(token);
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.use([\"/api/v1/profile\", \"/api/v1/profile/*\"],)"], "token", token, "validTokens", validTokens, "req.user", req.user);
-            res.redirect("/api/v1/login");
+        catch (err) {
+            console.error(err);
+            res.status(500).send({ success: false });
         }
     });
-    login.route("/api/v1/profile/lists")
+    login.use(["/profile", "/profile/*"], passport_1.default.authenticate("jwt", {
+        session: true,
+        failureRedirect: "/api/v1/login"
+    }));
+    login.route("/profile/lists")
         .get(async (req, res) => {
         try {
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile/lists').get"]);
             const offset = Number(req.query.offset ?? 0);
             const limit = Number(req.query.limit ?? 1);
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
+            Log("offset", offset, "limit", limit);
             const dbRes = await list_1.default.find({ user: req.user?.id }).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").get"], "dbRes", dbRes);
+            Log("dbRes", dbRes);
             if (dbRes != null)
                 res.json(dbRes);
             else
@@ -124,20 +214,19 @@ database_1.mongoDBReady.then(() => {
     })
         .post(async (req, res) => {
         try {
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile/lists').post"]);
             const newList = await new list_1.default({ parts: req.body.parts, user: req.user?.id }).save();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").post"], "newList", newList, "logged in user", req.user, "req.body", req.body, "req.params", req.params, "req.query", req.query);
+            Log("newList", newList);
             const user = await user_1.default.findById(req.user?.id).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").post"], "mongo user before", user?.toJSON());
-            if (!user) {
-                res.json(newList);
-                return;
-            }
+            Log("mongo user before", user?.toJSON());
+            if (!user)
+                return res.json(newList);
             if (user.lists)
                 user.lists.push(newList.id);
             else
                 user.lists = [newList.id];
             await user.save();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").post"], "mongo user after", (await user.populate("lists")).toJSON());
+            Log("mongo user after", (await user.populate("lists")).toJSON());
             if (newList != null)
                 res.json(newList);
             else
@@ -150,9 +239,9 @@ database_1.mongoDBReady.then(() => {
     })
         .delete(async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile/lists').delete"]);
             const dbRes = await list_1.default.deleteMany({ user: req.user?.id }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
+            Log("dbRes", dbRes);
             if (dbRes != null)
                 res.json(dbRes);
             else
@@ -163,12 +252,17 @@ database_1.mongoDBReady.then(() => {
             res.sendStatus(400);
         }
     });
-    login.route("/api/v1/profile/lists/id/:id")
+    login.route("/profile/lists/id/:id")
         .patch(async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists/id/:id\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
-            const dbRes = await list_1.default.updateOne({ _id: req.params.id, user: req.user?.id }, { $set: { parts: req.body.parts } }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists/id/:id\").patch"], "req.path", req.path, "dbRes", dbRes);
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile/lists/id/:id').patch"]);
+            Log("req.params", req.params, "req.user", req.user);
+            const dbRes = await list_1.default.updateOne({
+                _id: req.params.id, user: req.user?.id
+            }, {
+                $set: { parts: req.body.parts }
+            }).exec();
+            Log("dbRes", dbRes);
             if (dbRes != null)
                 res.json(dbRes);
             else
@@ -181,15 +275,17 @@ database_1.mongoDBReady.then(() => {
     })
         .delete(async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile/lists/id/:id').delete"]);
+            Log("req.body", req.body, "req.params", req.params, "req.user", req.user);
             const dbUserRes = await user_1.default.findById(req.user?.id).exec();
+            Log("dbUserRes before", dbUserRes);
             if (dbUserRes && dbUserRes.lists) {
                 dbUserRes.lists = dbUserRes.lists.filter(listId => !listId.equals(req.params.id));
                 dbUserRes.save();
-                (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "dbUserRes", dbUserRes);
+                Log("dbUserRes after", dbUserRes);
             }
             const dbListRes = await list_1.default.deleteOne({ _id: req.params.id, user: req.user?.id }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile/lists/id/:id\").delete"], "req.path", req.path, "dbListRes", dbListRes);
+            Log("dbListRes", dbListRes);
             if (dbListRes != null)
                 res.json(dbListRes);
             else
@@ -200,12 +296,17 @@ database_1.mongoDBReady.then(() => {
             res.sendStatus(400);
         }
     });
-    login.route("/api/v1/profile")
+    login.route("/profile")
         .patch(async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
-            const dbRes = await user_1.default.updateOne({ _id: req.user?.id }, { $set: { username: req.body.username } }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").patch"], "dbRes", dbRes);
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile').patch"]);
+            Log("req.body", req.body, "req.params", req.params, "req.user", req.user);
+            const dbRes = await user_1.default.updateOne({
+                _id: req.user?.id
+            }, {
+                $set: { username: req.body.username }
+            }).exec();
+            Log("dbRes", dbRes);
             if (dbRes)
                 res.json(dbRes);
             else
@@ -218,31 +319,28 @@ database_1.mongoDBReady.then(() => {
     })
         .delete(async (req, res) => {
         try {
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params, "req.user", req.user);
+            const Log = log.stackLogger(["mongooseConnectPromise.then", "login.route('/profile').delete"]);
+            Log("req.user", req.user);
             const dbListRes = await list_1.default.deleteMany({ user: req.user?.id }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").delete"], "dbListRes", dbListRes);
+            Log("dbListRes", dbListRes);
             const dbUserRes = await user_1.default.deleteOne({ _id: req.user?.id }).exec();
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").delete"], "dbUserRes", dbUserRes);
+            Log("dbUserRes", dbUserRes);
             res.json(dbUserRes);
-            validTokens.delete(req._jwtToken);
-            validTokens.forEach((token) => {
-                let jwtSession;
-                try {
-                    jwtSession = jsonwebtoken_1.default.decode(token);
-                }
-                catch (e) {
-                    console.error(e);
-                }
-                (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").delete", "validTokens.forEach"], "token", token, "jwtSession", jwtSession, "req._jwtToken", req._jwtToken, "validTokens", validTokens);
-                if (jwtSession && typeof jwtSession === "object" && typeof jwtSession.id === "string" && jwtSession.id === req.user?.id)
-                    validTokens.delete(token);
+            req.logout({ keepSessionInfo: false }, (err) => {
+                console.error(err);
             });
-            (0, api_1.dbgLog)("login.ts", ["mongoDBReady.then", "login.route(\"/api/v1/profile\").delete"], "req._jwtToken", req._jwtToken, "validTokens", validTokens);
         }
         catch (e) {
             console.error(e);
             res.sendStatus(400);
         }
+    });
+})
+    .catch((reason) => {
+    console.error(`\n\tERROR!:\n${reason}`);
+    login.use((_req, res) => {
+        console.error(`\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20));
+        res.sendStatus(503);
     });
 });
 //# sourceMappingURL=login.js.map

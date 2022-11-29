@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
-import { SessionUser } from "../../../types/api"
+import { SessionUser } from "~types/api"
 
 
 export interface SessionState {

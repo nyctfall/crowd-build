@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import PCPartList from "../components/PCPartList"
 import SearchPart from "../components/SearchPart"
 import { useAppSelector } from "../redux-stuff/hooks"
-import { dbgLog, filterDB, PCPartInfo } from "../../types/api"
+import { dbgLog, filterDB, PCPartInfo } from "~types/api"
 import { LinkContainer } from "react-router-bootstrap"
 import { Button } from "react-bootstrap"
 

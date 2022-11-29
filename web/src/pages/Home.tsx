@@ -1,6 +1,5 @@
 import { Carousel, Container } from "react-bootstrap"
 import { Link } from "react-router-dom"
-import "../styles/Home.scss"
 
 
 /**

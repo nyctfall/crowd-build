@@ -4,7 +4,7 @@ import { Button, Col, Form, Row, Spinner } from "react-bootstrap"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { usePostLoginQuery } from "../redux-stuff/query"
 import { sessionLogin, sessionSetToken } from "../redux-stuff/reducers/session"
-import { dbgLog } from "../../types/api"
+import { dbgLog } from "~types/api"
 
 
 /** 

@@ -1,9 +1,12 @@
 {
-  "extends": "../tsconfig.server.json",
-  "include": ["./"],
-  "exclude": [],
+  "extends": "../tsconfig.json",
+  "exclude": ["./dist-tsc/"],
   "compilerOptions": {
     "composite": true,
-    "incremental": true
+    "incremental": true,
+    "outDir": "./dist-tsc/",
+    "declarationDir": "./dist-tsc/",
+    "esModuleInterop": true,
+    "module": "CommonJS"
   }
 }

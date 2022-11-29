@@ -3,7 +3,7 @@ import { Button, Spinner } from "react-bootstrap"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { setAllMyListParts } from "../redux-stuff/reducers/myList"
 import useCacheList from "../hooks/useCacheList"
-import { dbgLog, PCPartInfo } from "../../types/api"
+import { dbgLog, PCPartInfo } from "~types/api"
 
 
 /**

@@ -1,4 +1,4 @@
-declare type typeofTypes = "undefined" | "object" | "boolean" | "number" | "bigint" | "string" | "symbol" | "function";
+type typeofTypes = "undefined" | "object" | "boolean" | "number" | "bigint" | "string" | "symbol" | "function";
 export interface ArrayWithTypesOpts<T> {
     type: T | typeofTypes;
     typeCoercer?: (arg0: any) => T | undefined;

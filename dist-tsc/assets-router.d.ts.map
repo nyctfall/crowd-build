@@ -1,1 +1,1 @@
-{"version":3,"file":"assets-router.d.ts","sourceRoot":"","sources":["../../../server/assets-router.ts"],"names":[],"mappings":"AAEA,QAAA,MAAM,YAAY,4CAAmB,CAAA;AAgBrC,OAAO,EAAE,YAAY,IAAI,MAAM,EAAE,CAAA"}
+{"version":3,"file":"assets-router.d.ts","sourceRoot":"","sources":["../server/assets-router.ts"],"names":[],"mappings":"AASA,QAAA,MAAM,YAAY,4CAAmB,CAAA;AAsBrC,OAAO,EAAE,YAAY,EAAE,CAAA"}

@@ -3,27 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CrowdBuild</title>
-    
-    {{#if development}}
-
-      <script type="module">
-        import RefreshRuntime from 'http://localhost:5173/@react-refresh'
-        RefreshRuntime.injectIntoGlobalHook(window)
-        window.$RefreshReg$ = () => {}
-        window.$RefreshSig$ = () => (type) => type
-        window.__vite_plugin_react_preamble_installed__ = true
-      </script>
-
-      <script type="module" src="http://localhost:5173/@vite/client"></script>
-      <script type="module" src="http://localhost:5173/src/main.tsx"></script>
-    {{/if}}
-    
+    <title>CrowdBuild{{#unless production}} Dev Server{{/unless}}</title>
     {{#if production}}
-      <script type="module" src="/assets/main.js"></script>
-      <link rel="stylesheet" href="/assets/main.css" />
-    {{/if}}
+      {{#each js}}
 
+    <script type="module" src="{{this}}"></script>
+    
+      {{/each}}
+      {{#each css}}
+
+    <link rel="stylesheet" href="{{this}}" />
+
+      {{/each}}
+    {{else}}
+      {{{VITE_DEV}}}
+    {{/if}}
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   </head>
   <body>

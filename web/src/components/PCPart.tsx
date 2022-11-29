@@ -1,7 +1,7 @@
 import { Button } from "react-bootstrap"
 import reactLogo from "../assets/react.svg"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
-import { dbgLog, PCPartInfo } from "../../types/api"
+import { dbgLog, PCPartInfo } from "~types/api"
 import { addMyListPart, removeMyListPart } from "../redux-stuff/reducers/myList"
 
 

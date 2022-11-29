@@ -4,98 +4,70 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ROOT = exports.server = exports.app = void 0;
+require("dotenv").config({ path: "../.env" });
+const node_path_1 = __importDefault(require("node:path"));
 const express_1 = __importDefault(require("express"));
-const path_1 = __importDefault(require("path"));
 const consolidate_1 = __importDefault(require("consolidate"));
 const cors_1 = __importDefault(require("cors"));
+const api_1 = require("~types/api");
 const assets_router_1 = require("./assets-router");
 const database_1 = require("./database");
 const login_1 = require("./login");
-const api_1 = require("../types/api");
+const MANIFEST_JSON = require("../dist/manifest.json");
 const app = (0, express_1.default)();
 exports.app = app;
-const { PORT = 8080, NODE_ENV } = process.env;
-const ROOT = path_1.default.join(__dirname, "../../../dist");
-exports.ROOT = ROOT;
-app.use(database_1.dbHandler);
-app.use(login_1.login);
+const PROJECT_ROOT = node_path_1.default.join(__dirname, "../");
+const STATIC_ROOT = node_path_1.default.join(PROJECT_ROOT, "./dist");
+exports.ROOT = STATIC_ROOT;
+const { PORT = 8080, VITE_PORT = 5173, NODE_ENV } = process.env;
+const log = api_1.dbgLog.fileLogger("server.ts");
 app.use((0, cors_1.default)({
-    origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
+    origin: ["*", `http://localhost:${VITE_PORT}`, `http://localhost:${PORT}`]
 }));
-app.use("/", express_1.default.static(ROOT));
-app.use("/src", assets_router_1.router);
+app.use(express_1.default.static(STATIC_ROOT));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.engine("hbs", consolidate_1.default.handlebars);
 app.set("view engine", "hbs");
-app.set("views", "./views");
-app.get("/", (_req, res) => {
+app.set("views", node_path_1.default.join(PROJECT_ROOT, "./views"));
+app.use((req, _res, next) => {
+    log("app.use", "req.originalUrl", req.originalUrl, "req.url", req.url, "req.baseUrl", req.baseUrl, "req.path", req.path, "req.route", req.route, "req.hostname", req.hostname, "req.cookies", req.cookies, "req.signedCookies", req.signedCookies, "req.headers", req.headers, "req.user", req.user, "req.protocol", req.protocol, "req.method", req.method, "req.xhr", req.xhr, "req.query", req.query, "req.params", req.params, "req.body", req.body);
+    next();
+});
+app.use("/src", assets_router_1.assetsRouter);
+app.use("/api/v1", database_1.dbHandler, login_1.login);
+app.use(login_1.loginSession);
+app.use(login_1.passportInit);
+app.use(login_1.passportSession);
+app.get("/*", (req, res) => {
+    const mapping = Object.values(MANIFEST_JSON).filter(chunk => chunk.isEntry);
+    const VITE_DEV = `
+    <script type="module">
+      import RefreshRuntime from "http://localhost:${VITE_PORT}/@react-refresh"
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (type) => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+
+    <script type="module" src="http://localhost:${VITE_PORT}/@vite/client"></script>
+    <script type="module" src="http://localhost:${VITE_PORT}/${mapping.find(chunk => "css" in chunk)?.src}"></script>
+`;
     res.render("index", {
-        development: NODE_ENV !== "production",
-        production: NODE_ENV === "production"
+        production: NODE_ENV === "production",
+        VITE_DEV,
+        js: mapping.map(entryChunk => entryChunk.file),
+        css: mapping.filter(entryChunk => "css" in entryChunk).map(entryChunk => entryChunk.css).flat(Infinity)
     });
 });
-app.get("/dev", (_req, res) => {
-    res.sendFile("./dev.html", { root: ROOT });
-});
-app.get("/prod", (_req, res) => {
-    res.sendFile("./prod.html", { root: ROOT });
-});
-app.get("/*", (_req, res) => {
-    res.render("index", {
-        development: NODE_ENV !== "production",
-        production: NODE_ENV === "production"
-    });
-});
+app.use(((err, _req, res, _next) => {
+    console.error(err);
+    res.sendStatus(500);
+}));
 const server = app.listen(PORT, () => {
     console.log(`\n\tApp running in port ${PORT}`);
-    console.log(`\n\tNODE_ENV MODE: ${process.env.NODE_ENV === "production" ? "production" : "developement"}`);
+    console.log(`\n\tNODE_ENV MODE: "${process.env.NODE_ENV === "production" ? "production" : "developement"}"`);
     console.log(`\n\t> Local: http://localhost:${PORT}/`);
 });
 exports.server = server;
-const destroyServer = (() => {
-    const CONNECTIONS = [];
-    server.on("connect", (connection) => {
-        const index = CONNECTIONS.length;
-        CONNECTIONS.push(connection);
-        (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connect\")"], "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "", "open #", index);
-        connection.on("close", function () {
-            (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connect\")", "connection.on(\"close\")"], "close #", index);
-            CONNECTIONS.splice(index);
-        });
-    });
-    server.on("connection", (connection) => {
-        const index = CONNECTIONS.length;
-        CONNECTIONS.push(connection);
-        (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connection\")"], "____________________________________________________________________", "", "open #", index);
-        connection.on("close", function () {
-            (0, api_1.dbgLog)("server.ts", ["destroyServer", "server.on(\"connection\")", "connection.on(\"close\")"], "close #", index);
-            CONNECTIONS.splice(index);
-        });
-    });
-    return () => {
-        console.log("\n\tclosing server...");
-        server.close();
-        console.log("\n\tdestroying connections...");
-        for (let conn of CONNECTIONS) {
-            console.log("\n\tdestroying a connection...");
-            conn.destroy();
-        }
-        process.exit();
-    };
-})();
-const exitServer = (signal) => {
-    console.log(`\n\tServer received SIGNAL: ${signal}`);
-    process.exit();
-};
-const cleanup = (exitCode) => {
-    console.log(`\n\tClosing HTTP server. Exit code: ${exitCode}`);
-    server.close();
-    destroyServer();
-    process.exit();
-};
-process.on("exit", cleanup);
-process.on("SIGTERM", exitServer);
-process.on("SIGINT", exitServer);
-process.on("SIGHUP", exitServer);
 //# sourceMappingURL=server.js.map

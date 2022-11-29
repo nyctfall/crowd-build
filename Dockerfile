@@ -40,7 +40,7 @@ COPY ["./dist*", "./public", "./views", "./"]
 RUN npm run init-db
 
 # run program in this project:
-CMD [ "node", "dist-tsc/js/server/server.js" ]
+CMD [ "node", "dist-tsc/server.js" ]
 
 # allow server port:
 EXPOSE 8080

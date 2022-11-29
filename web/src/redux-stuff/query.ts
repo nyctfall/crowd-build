@@ -1,6 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
-import { dbgLog, PCPartSearchURI, SessionUser } from "../../types/api"
-import type { PCPartSearchParamsState, PCPartInfo, DeleteListParams, EditListParams, FetchListParams, FetchSubsetParams, List, NewsStory, PatchUserParams, SaveListParams, SessionType, ModifyResponce, DeleteResponce, LoginOrSigninCredentials } from "../../types/api"
+import { dbgLog, PCPartSearchURI, SessionUser, PCPartSearchParamsState, PCPartInfo, DeleteListParams, EditListParams, FetchListParams, FetchSubsetParams, List, NewsStory, PatchUserParams, SaveListParams, SessionType, ModifyResponce, DeleteResponce, LoginOrSigninCredentials } from "~types/api"
 import jwtDecode, { JwtPayload } from "jwt-decode"
 
 

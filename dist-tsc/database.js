@@ -3,36 +3,35 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mongoDBReady = exports.dbHandler = void 0;
-const cors_1 = __importDefault(require("cors"));
+exports.mongooseConnection = exports.mongooseConnectPromise = exports.mongooseConnect = exports.mongoDBReady = exports.dbHandler = void 0;
 const express_1 = __importDefault(require("express"));
 const mongoose_1 = __importDefault(require("mongoose"));
+const api_1 = require("~types/api");
 const part_1 = __importDefault(require("./models/part"));
 const list_1 = __importDefault(require("./models/list"));
 const user_1 = __importDefault(require("./models/user"));
 const news_1 = __importDefault(require("./models/news"));
-const api_1 = require("../types/api");
 const dbHandler = express_1.default.Router();
 exports.dbHandler = dbHandler;
-const { MONGODB, REDIS, PORT = 8080 } = process.env;
+const { MONGODB = "mongodb://127.0.0.1:27017", REDIS } = process.env;
+let mongooseConnectPromise;
+exports.mongooseConnectPromise = mongooseConnectPromise;
+let mongooseConnect;
+exports.mongooseConnect = mongooseConnect;
 let mongoDBReady = new Promise((resolve) => {
     const sayReady = () => resolve(true);
     mongoose_1.default.connection.on("connected", sayReady).on("connecting", sayReady).on("open", sayReady);
 });
 exports.mongoDBReady = mongoDBReady;
-dbHandler.use(express_1.default.json());
-dbHandler.use(express_1.default.urlencoded({ extended: true }));
-dbHandler.use((0, cors_1.default)({
-    origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
-}));
 if (MONGODB) {
     ;
     (async () => {
         try {
-            await mongoose_1.default.connect(MONGODB);
-            console.log(`\n\t> MongoDB: "${MONGODB}" ready...\n`);
+            exports.mongooseConnectPromise = mongooseConnectPromise = mongoose_1.default.connect(MONGODB);
+            exports.mongooseConnect = mongooseConnect = await mongooseConnectPromise;
+            console.log(`\n\t> MongoDB: "${MONGODB}" ready...`);
             exports.mongoDBReady = mongoDBReady = Promise.resolve(true);
-            dbHandler.route("/api/v1/parts")
+            dbHandler.route("/parts")
                 .get(async (req, res) => {
                 try {
                     (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/parts\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
@@ -82,7 +81,7 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.route("/api/v1/parts/id/:id")
+            dbHandler.route("/parts/id/:id")
                 .get(async (req, res) => {
                 try {
                     (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.get(\"/api/v1/parts/id/:id\")"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
@@ -98,7 +97,7 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.route("/api/v1/lists")
+            dbHandler.route("/lists")
                 .get(async (req, res) => {
                 try {
                     const offset = Number(req.query.offset ?? 0);
@@ -131,7 +130,7 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.route("/api/v1/lists/id/:id")
+            dbHandler.route("/lists/id/:id")
                 .get(async (req, res) => {
                 try {
                     (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/lists/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
@@ -177,7 +176,7 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.route("/api/v1/users/id/:id")
+            dbHandler.route("/users/id/:id")
                 .get(async (req, res) => {
                 try {
                     (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/users/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
@@ -193,7 +192,7 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.route("/api/v1/users")
+            dbHandler.route("/users")
                 .get(async (req, res) => {
                 try {
                     const offset = Number(req.query.offset ?? 0);
@@ -226,13 +225,14 @@ if (MONGODB) {
                     res.sendStatus(400);
                 }
             });
-            dbHandler.get("/api/v1/news", async (req, res) => {
+            dbHandler.get("/news", async (req, res) => {
                 try {
                     const offset = Number(req.query.offset ?? 0);
                     const limit = Number(req.query.limit ?? 1);
-                    (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/users\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
+                    (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/news\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params);
                     const dbRes = await news_1.default.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
-                    (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/users\").post"], "dbRes", dbRes);
+                    (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/news\").get"], "dbRes", dbRes);
+                    (0, api_1.dbgLog)("database.ts", ["if(MONGODB)", "dbHandler.route(\"/api/v1/news\").get"], "await News.find({}).sort({ createdAt: -1 })", await news_1.default.find({}).sort({ createdAt: -1 }));
                     if (dbRes != null)
                         res.json(dbRes);
                     else
@@ -246,7 +246,19 @@ if (MONGODB) {
         }
         catch (err) {
             console.error(err);
+            dbHandler.use("*", (_req, res) => {
+                console.error("\n\tError connecting to MongoDB database!!!!".repeat(10));
+                res.sendStatus(503);
+            });
         }
     })();
 }
+else {
+    console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(10));
+    dbHandler.use("*", (_req, res) => {
+        console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(20));
+        res.sendStatus(503);
+    });
+}
+exports.mongooseConnection = mongoose_1.default.connection;
 //# sourceMappingURL=database.js.map

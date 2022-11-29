@@ -36,14 +36,6 @@ const NewsSchema = new mongoose_1.Schema({
     content: {
         type: String,
         required: false
-    },
-    createdAt: {
-        type: String,
-        required: true
-    },
-    updatedAt: {
-        type: String,
-        required: true
     }
 }, {
     timestamps: true,

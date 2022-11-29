@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react"
-import { skipToken } from "@reduxjs/toolkit/dist/query"
 import { Button, Container, Placeholder, Spinner } from "react-bootstrap"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { usePostListMutation } from "../redux-stuff/query"
 import { addList } from "../redux-stuff/reducers/allLists"
-import { dbgLog, PCPartInfo } from "../../types/api"
+import { dbgLog, PCPartInfo } from "~types/api"
 
 
 /**

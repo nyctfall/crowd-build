@@ -1,19 +1,34 @@
-import cors from "cors"
 import express from "express"
+import cors from "cors"
 import mongoose from "mongoose"
+import { dbgLog } from "~types/api"
 import Parts from "./models/part"
 import Lists from "./models/list"
 import Users from "./models/user"
 import News from "./models/news"
-import { dbgLog } from "../types/api"
+
 
 /**
  * @file The logic and HTTP handlers for the database quests and other db operations.
  */
 
+
+/**
+ * The MongoDB database API Express Router.
+ */
 const dbHandler = express.Router()
 
-const { MONGODB, REDIS, PORT = 8080 } = process.env
+
+const { 
+  MONGODB = "mongodb://127.0.0.1:27017", 
+  REDIS
+} = process.env
+
+
+let mongooseConnectPromise: ReturnType<typeof mongoose.connect>
+
+let mongooseConnect: typeof mongoose
+
 
 // on connection promise:
 let mongoDBReady = new Promise((resolve) => {
@@ -22,30 +37,26 @@ let mongoDBReady = new Promise((resolve) => {
   mongoose.connection.on("connected", sayReady).on("connecting", sayReady).on("open", sayReady)
 })
 
-// for parsing application/json
-dbHandler.use(express.json())
-// for parsing application/x-www-form-urlencoded
-dbHandler.use(express.urlencoded({ extended: true }))
-
-// CORS headers for dev server:
-dbHandler.use(cors({
-  origin: ["*", "http://localhost:5173", `http://localhost:${PORT}`]
-}))
 
 // mongodb server:
 if (MONGODB){
   ;(async () => {
     try {
       // connect to DB:
-      await mongoose.connect(MONGODB)
+      mongooseConnectPromise = mongoose.connect(MONGODB)
       
-      console.log(`\n\t> MongoDB: "${MONGODB}" ready...\n`)
+      mongooseConnect = await mongooseConnectPromise
+
+
+      console.log(`\n\t> MongoDB: "${MONGODB}" ready...`)
       
+
       // mongodb server is up and running:
       mongoDBReady = Promise.resolve(true)
       
+
       // part database:
-      dbHandler.route("/api/v1/parts")
+      dbHandler.route("/parts")
       /** @todo User suggested/voted parts POST, PATCH, DELETE? */
       .get(async (req, res) => {
         try {
@@ -103,7 +114,8 @@ if (MONGODB){
         }
       })
       
-      dbHandler.route("/api/v1/parts/id/:id")
+
+      dbHandler.route("/parts/id/:id")
       /** @todo User suggested/voted parts POST, PATCH, DELETE? */
       .get(async (req, res) => {
         // find one part by its id:
@@ -126,8 +138,9 @@ if (MONGODB){
         }
       })
       
+
       // user created lists:
-      dbHandler.route("/api/v1/lists")
+      dbHandler.route("/lists")
       .get(async (req, res) => {
         // send all lists:
         try {
@@ -177,8 +190,9 @@ if (MONGODB){
         }
       })
       
+      
       // get, edit, or delete a list:
-      dbHandler.route("/api/v1/lists/id/:id")
+      dbHandler.route("/lists/id/:id")
       .get(async (req, res) => {
         // send the list at id if there is one:
         try {
@@ -241,8 +255,9 @@ if (MONGODB){
         }
       })
 
+
       // get, edit, or delete a user:
-      dbHandler.route("/api/v1/users/id/:id")
+      dbHandler.route("/users/id/:id")
       .get(async (req, res) => {
         // send the user at id if there is one:
         try {
@@ -264,8 +279,9 @@ if (MONGODB){
         }
       })
 
+
       // save a new user to db:
-      dbHandler.route("/api/v1/users")
+      dbHandler.route("/users")
       .get(async (req, res) => {
         // get all users's usernames and ids:
         try {
@@ -312,8 +328,9 @@ if (MONGODB){
         }
       })
 
+
       // news story db:
-      dbHandler.get("/api/v1/news", async (req, res) => {
+      dbHandler.get("/news", async (req, res) => {
         // find latest news, limit is number of stories, and offset is how many of the latests to skip:
         try {
           // skip certain number of newest stories:
@@ -322,13 +339,14 @@ if (MONGODB){
           const limit = Number(req.query.limit ?? 1)
 
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
 
 
           const dbRes = await News.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
 
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "dbRes", dbRes)
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "dbRes", dbRes)
+          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "await News.find({}).sort({ createdAt: -1 })", await News.find({}).sort({ createdAt: -1 }))
 
 
           if (dbRes != null) res.json(dbRes)
@@ -343,9 +361,30 @@ if (MONGODB){
     catch (err){
       // something went wrong connecting to DB:
       console.error(err)
+      
+      // send that server cannot use db:
+      dbHandler.use("*", (_req, res) => {
+        console.error("\n\tError connecting to MongoDB database!!!!".repeat(10))
+        
+        res.sendStatus(503)
+      })
     }  
-  })()  
-}  
+  })()
+}
+// add error message for no database:
+else {
+  console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(10))
+  
+  // send that server cannot use db:
+  dbHandler.use("*", (_req, res) => {
+    console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(20))
+    
+    res.sendStatus(503)
+  })
+}
 
 
-export { dbHandler, mongoDBReady }
+export { dbHandler, mongoDBReady, mongooseConnect, mongooseConnectPromise }
+
+/** The mongoose MongoDB connection created and used by the dbHandler Express Router. */
+export const mongooseConnection = mongoose.connection 

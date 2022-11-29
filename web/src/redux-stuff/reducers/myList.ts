@@ -1,5 +1,5 @@
 import { createEntityAdapter, createSlice } from "@reduxjs/toolkit"
-import type { PCPartInfo } from "../../../types/api"
+import type { PCPartInfo } from "~types/api"
 
 
 const myListAdapter = createEntityAdapter<PCPartInfo>({

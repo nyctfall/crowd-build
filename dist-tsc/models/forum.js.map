@@ -1,1 +1,1 @@
-{"version":3,"file":"forum.js","sourceRoot":"","sources":["../../../../server/models/forum.ts"],"names":[],"mappings":""}
+{"version":3,"file":"forum.js","sourceRoot":"","sources":["../../server/models/forum.ts"],"names":[],"mappings":""}

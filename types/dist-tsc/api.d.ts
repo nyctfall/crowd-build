@@ -1,7 +1,28 @@
 import Big, { BigSource } from "big.js";
 import { ArrayWithTypes } from "./array-type";
 import type { ArrayWithTypesOpts } from "./array-type";
-export declare const dbgLog: (file: string, trace: string | string[], ...logs: Array<string | any>) => void;
+declare const dbgLog: Logger;
+export declare const dbgFileLogger: FileLoggerFactory;
+export type LogFn = (file: string, trace: string | string[], ...logs: Array<string | any>) => void;
+export type FileLogFn = (trace: string | string[], ...logs: Array<string | any>) => void;
+export type StackLogFn = (...logs: Array<string | any>) => void;
+export type Logger = LogFn & LoggerProps;
+export type FileLogger = FileLogFn & FileLoggerProps;
+export type StackLogger = StackLogFn & StackLoggerProps;
+export type FileLoggerFactory = (file: string) => FileLogger;
+export type StackLoggerFactory = (trace: string | string[]) => StackLogger;
+export interface LoggerProps extends Function {
+    fileLogger: FileLoggerFactory;
+}
+export interface FileLoggerProps extends Function {
+    stackLogger: StackLoggerFactory;
+    file?: string;
+}
+export interface StackLoggerProps extends Function {
+    file: string;
+    trace: string | string[];
+}
+export { dbgLog };
 export interface SessionUser {
     _id: string;
     username: string;
@@ -20,7 +41,7 @@ export interface FetchSubsetParams {
     offset?: number;
     limit?: number;
 }
-export declare type FetchListParams = FetchSubsetParams & {
+export type FetchListParams = FetchSubsetParams & {
     id?: string;
 } & ({
     token: string;
@@ -31,7 +52,7 @@ export interface SaveListParams {
     token?: string;
     parts: string[];
 }
-export declare type EditListParams = SaveListParams & {
+export type EditListParams = SaveListParams & {
     id: string;
 };
 export interface LoginCredentials {
@@ -71,8 +92,8 @@ interface DBModifyRes {
     upsertedCount?: number;
     matchedCount?: number;
 }
-export declare type DeleteResponce = DBAckRes & DBDeleteRes;
-export declare type ModifyResponce = DBAckRes & DBModifyRes;
+export type DeleteResponce = DBAckRes & DBDeleteRes;
+export type ModifyResponce = DBAckRes & DBModifyRes;
 export interface NewsStory {
     _id: string;
     title: string;
@@ -93,6 +114,41 @@ export declare enum PCPartType {
     PSU = "PSU",
     Case = "Case"
 }
+export interface PCPartTypeInfo {
+    platform?: "desktop" | "mobile" | "server" | "embedded";
+    unlocked?: boolean;
+    codename?: Capitalize<string>;
+    architechure?: string;
+    PCIe?: `${number}.${number}`;
+    PIB?: string | boolean;
+    socket?: string;
+    memory?: `${"Q" | "D" | "S"}DR${string}`;
+    memorySpeed?: `DDR${number}-${number}`;
+    memoryChannels?: number;
+    cores?: number;
+    pCores?: number | boolean;
+    eCores?: number | boolean;
+    threads?: number;
+    SMT?: boolean;
+    hyperthreading?: boolean;
+    baseClock?: `${number}${"G" | "M" | "K"}Hz`;
+    boostClock?: `${number}${"G" | "M" | "K"}Hz`;
+    TjMax?: `${number}C`;
+    TDP?: `${number}W`;
+    L1Cache?: `${number}${"M" | "K"}B` | boolean;
+    L2Cache?: `${number}${"M" | "K"}B` | boolean;
+    L3Cache?: `${number}${"M" | "K"}B` | boolean;
+    graphincs?: string | boolean;
+    graphincsArchitechure?: string;
+    graphincsCores?: number;
+    graphincsBaseClock?: `${number}${"G" | "M" | "K"}Hz`;
+    graphincsBoostClock?: `${number}${"G" | "M" | "K"}Hz`;
+    processNode?: string;
+    productFamily?: string;
+    productLine?: string;
+    productIdBoxed?: string;
+    productIdTray?: string;
+}
 export interface PCPartInfo {
     _id: string;
     name: string;
@@ -100,7 +156,7 @@ export interface PCPartInfo {
     oem?: string;
     model?: string;
     released?: string;
-    typeInfo?: Record<string, any>;
+    typeInfo?: PCPartTypeInfo;
     rating?: string;
     ratings?: string;
     MSRP: string | number;
@@ -136,6 +192,5 @@ export declare class PCPartSearchURI {
     toURIEncoded(): URLSearchParams;
     toString(): string;
 }
-export declare const filterDB: (data: PCPartInfo[], query: qs.ParsedQs | PCPartSearchParamsState | Record<string, string | string[]> | Record<string, any>) => PCPartInfo[];
-export {};
+export declare const filterDB: (data: PCPartInfo[], query: PCPartSearchParamsState | Record<string, string | string[]> | Record<string, any>) => PCPartInfo[];
 //# sourceMappingURL=api.d.ts.map

@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useFetchListsQuery } from "../redux-stuff/query"
 import { addManyLists, addList } from "../redux-stuff/reducers/allLists"
 import useCacheParts from "./useCacheParts"
-import { dbgLog } from "../../types/api"
+import { dbgLog } from "~types/api"
 
 
 /**

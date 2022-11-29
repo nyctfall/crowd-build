@@ -1,5 +1,5 @@
 import { createEntityAdapter, createSlice } from "@reduxjs/toolkit"
-import type { List } from "../../../types/api"
+import type { List } from "~types/api"
 
 
 const allListsAdapter = createEntityAdapter<List>({
