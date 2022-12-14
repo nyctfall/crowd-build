@@ -10,7 +10,7 @@ export type Logger = LogFn & LoggerProps;
 export type FileLogger = FileLogFn & FileLoggerProps;
 export type StackLogger = StackLogFn & StackLoggerProps;
 export type FileLoggerFactory = (file: string) => FileLogger;
-export type StackLoggerFactory = (trace: string | string[]) => StackLogger;
+export type StackLoggerFactory = (...trace: string[] | [string | string[]]) => StackLogger;
 export interface LoggerProps extends Function {
     fileLogger: FileLoggerFactory;
 }
@@ -23,6 +23,7 @@ export interface StackLoggerProps extends Function {
     trace: string | string[];
 }
 export { dbgLog };
+export type UnPromise<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
 export interface SessionUser {
     _id: string;
     username: string;

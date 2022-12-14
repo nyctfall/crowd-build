@@ -1,4 +1,4 @@
-import mongoose, { ObjectId, Schema } from "mongoose"
+import mongoose, { Schema, Model, Query, Document, ObjectId } from "mongoose"
 
 
 export interface NewsType {
@@ -7,8 +7,19 @@ export interface NewsType {
   content?: string
 }
 
+export interface NewsTypeQueryHelpers {
+  byId(id: ObjectId | string | ObjectId[] | string[]): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byLink(link: string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byTitle(title: string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byContent(content: string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byCreatedBefore(maxDate: Date | string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byCreatedAfter(minDate: Date | string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byUpdatedBefore(maxDate: Date | string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+  byUpdatedAfter(minDate: Date | string): Query<any, Document<NewsType>> & NewsTypeQueryHelpers
+}
 
-const NewsSchema = new Schema<NewsType>({
+
+const NewsSchema = new Schema<NewsType, Model<NewsType, NewsTypeQueryHelpers>>({
     title: {
       type: String,
       required: true
@@ -71,7 +82,7 @@ const NewsSchema = new Schema<NewsType>({
 )
 
 
-const News = mongoose.model("News", NewsSchema)
+const News = mongoose.model<NewsType, Model<NewsType, NewsTypeQueryHelpers>>("News", NewsSchema)
 
 
 export default News

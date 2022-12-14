@@ -20,10 +20,10 @@ exports.dbgLog = dbgLog;
 const dbgFileLogger = (file) => {
     const fileFn = (...args) => dbgLog(file, ...args);
     fileFn.file = file;
-    fileFn.stackLogger = (trace) => {
-        const stackFn = (...logs) => fileFn(trace, ...logs);
-        stackFn.file = fileFn.file;
-        stackFn.trace = trace;
+    fileFn.stackLogger = (...trace) => {
+        const stackFn = (...logs) => fileFn(trace.flat(), ...logs);
+        stackFn.file = file;
+        stackFn.trace = trace.flat();
         return stackFn;
     };
     return fileFn;

@@ -1,91 +1,106 @@
 import express from "express"
-import cors from "cors"
 import mongoose from "mongoose"
-import { dbgLog } from "~types/api"
+import { dbgLog, UnPromise } from "~types/api"
 import Parts from "./models/part"
 import Lists from "./models/list"
 import Users from "./models/user"
 import News from "./models/news"
 
-
 /**
  * @file The logic and HTTP handlers for the database quests and other db operations.
  */
-
 
 /**
  * The MongoDB database API Express Router.
  */
 const dbHandler = express.Router()
 
-
-const { 
-  MONGODB = "mongodb://127.0.0.1:27017", 
+const {
+  MONGODB = "mongodb://127.0.0.1:27017",
   REDIS
 } = process.env
 
+// debugging logger:
+const log = dbgLog.fileLogger("database.ts")
 
+/**
+ * Promise for mongoose connection. 
+ */
 let mongooseConnectPromise: ReturnType<typeof mongoose.connect>
 
-let mongooseConnect: typeof mongoose
+/**
+ * Resolved promise value from mongoose connection. 
+ */
+let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
 
-
-// on connection promise:
-let mongoDBReady = new Promise((resolve) => {
-  const sayReady = () => resolve(true)
+;(async () => {
+  // add error message for no database:
+  if (!MONGODB){
+    log("MONGODB == false", "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(10))
   
-  mongoose.connection.on("connected", sayReady).on("connecting", sayReady).on("open", sayReady)
-})
+    // send that server cannot use db:
+    return dbHandler.use((_req, res) => {
+      log(["MONGODB == false", "dbHandler.use"], "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(20))
+  
+      res.sendStatus(503)
+    })
+  }
+    
+  // mongodb server:
+  try {
+    // connect to DB:
+    mongooseConnectPromise = mongoose.connect(MONGODB)
+    
+    // wait for connection to finish:
+    mongooseConnect = await mongooseConnectPromise
 
+    console.log(`\n\t> MongoDB: "${MONGODB}" ready...`)
 
-// mongodb server:
-if (MONGODB){
-  ;(async () => {
-    try {
-      // connect to DB:
-      mongooseConnectPromise = mongoose.connect(MONGODB)
-      
-      mongooseConnect = await mongooseConnectPromise
-
-
-      console.log(`\n\t> MongoDB: "${MONGODB}" ready...`)
-      
-
-      // mongodb server is up and running:
-      mongoDBReady = Promise.resolve(true)
-      
-
-      // part database:
-      dbHandler.route("/parts")
+    // part database:
+    dbHandler
+      .route("/parts")
       /** @todo User suggested/voted parts POST, PATCH, DELETE? */
       .get(async (req, res) => {
+        const Log = log.stackLogger("dbHandler.route('/parts').get")
+
+        Log("req.query", req.query)
+
+        const id: any = req.query.id ?? req.query.ids
+        const name: any = req.query.name ?? req.query.names
+        const type: any = req.query.type ?? req.query.types
+        const oem: any = req.query.oem ?? req.query.oems
+        const model: any = req.query.model ?? req.query.models
+        const minPrice: any = req.query.minPrice
+        const maxPrice: any = req.query.maxPrice
+        const releasedAfter: any = req.query.releasedAfter
+        const releasedBefore: any = req.query.releasedBefore
+        const typeInfo: any = req.query.typeInfo
+
+        // skip certain number of newest stories:
+        const offset = Number(req.query.offset ?? 0)
+        // only get limited number of stories:
+        const limit = Number(req.query.limit ?? 1)
+
+        // prettier-ignore
+        Log(
+          "id", id,
+          "name", name,
+          "type", type,
+          "oem", oem,
+          "model", model,
+          "minPrice", minPrice,
+          "maxPrice", maxPrice,
+          "releasedAfter", releasedAfter,
+          "releasedBefore", releasedBefore,
+          "typeInfo", typeInfo,
+          "offset", offset,
+          "limit", limit
+        )
+
         try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-          
-
-          const id: any = req.query.id ?? req.query.ids
-          const name: any = req.query.name ?? req.query.names
-          const type: any = req.query.type ?? req.query.types
-          const oem: any = req.query.oem ?? req.query.oems
-          const model: any = req.query.model ?? req.query.models
-          const minPrice: any = req.query.minPrice
-          const maxPrice: any = req.query.maxPrice
-          const releasedAfter: any = req.query.releasedAfter
-          const releasedBefore: any = req.query.releasedBefore
-          const typeInfo: any = req.query.typeInfo
-
-          // skip certain number of newest stories:
-          const offset = Number(req.query.offset ?? 0)
-          // only get limited number of stories:
-          const limit = Number(req.query.limit ?? 1)
-          
-          
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "id", id, "name", name, "type", type, "oem", oem, "model", model, "minPrice", minPrice, "maxPrice", maxPrice, "releasedAfter", releasedAfter, "releasedBefore", releasedBefore, "typeInfo", typeInfo, "offset", offset, "limit", limit)
-
-
           // get a part by query params:
           const dbQuery = Parts.find()
-          
+
           if (id) dbQuery.byId(id)
           if (name) dbQuery.byName(name)
           if (type) dbQuery.byType(type)
@@ -96,295 +111,273 @@ if (MONGODB){
           if (releasedAfter) dbQuery.byReleasedAfter(releasedAfter)
           if (releasedBefore) dbQuery.byReleasedBefore(releasedBefore)
           if (typeInfo) dbQuery.byTypeInfo(typeInfo)
+
+          Log("dbQuery", dbQuery)
           
           const dbRes = await dbQuery.exec()
-  
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/parts\").get"], "dbRes", dbRes)
-          
+          Log("dbRes", dbRes)
 
           // if there was no error, return result, which could be an empty array:
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch(e){
-          console.error(e)
+          res.json(dbRes)
+        } catch (e){
+          Log("err", e)
 
           // the db threw an error, somthing was wrong:
           res.sendStatus(400)
         }
       })
-      
 
-      dbHandler.route("/parts/id/:id")
+    dbHandler
+      .route("/parts/id/:id")
       /** @todo User suggested/voted parts POST, PATCH, DELETE? */
       .get(async (req, res) => {
-        // find one part by its id:
+        const Log = log.stackLogger("dbHandler.get('/parts/id/:id')")
+
+        Log("req.params", req.params)
+        
         try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.get(\"/api/v1/parts/id/:id\")"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-          
-
+          // find one part by its id:
           const dbRes = await Parts.findById(req.params.id).exec()
-          
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.get(\"/api/v1/parts/id/:id\")"], "req.path", req.path, "dbRes", dbRes)
-          
+          Log("dbRes", dbRes)
 
-          if (dbRes != null) res.json(dbRes)
+          if (dbRes) res.json(dbRes)
           else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
-          
+        } catch (e){
+          Log("err", e)
+
           res.sendStatus(400)
         }
       })
-      
 
-      // user created lists:
-      dbHandler.route("/lists")
+    // user created lists:
+    dbHandler
+      .route("/lists")
       .get(async (req, res) => {
-        // send all lists:
+        const Log = log.stackLogger("dbHandler.route('/lists').get")
+
+        Log("req.query", req.query)
+
+        // skip certain number of newest stories:
+        const offset = Number(req.query.offset ?? 0)
+
+        // only get limited number of stories:
+        const limit = Number(req.query.limit ?? 1)
+        
+        Log("offset", offset, "limit", limit)
+
         try {
-          // skip certain number of newest stories:
-          const offset = Number(req.query.offset ?? 0)
-          // only get limited number of stories:
-          const limit = Number(req.query.limit ?? 1)
-          
-          
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-          
-          
-          const dbRes = await Lists.find().sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
-          
+          // get lists:
+          const dbRes = await Lists
+            .find()
+            .sort({ createdAt: -1 })
+            .skip(offset)
+            .limit(limit)
+            .exec()
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").get"], "dbRes", dbRes)
-          
+          Log("dbRes", dbRes)
 
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
-          
+          // if there was no error, return result, which could be an empty array:
+          res.json(dbRes)
+        } catch (e){
+          Log("err", e)
+
           res.sendStatus(400)
         }
       })
       // save a list to db:
       .post(async (req, res) => {
+        const Log = log.stackLogger("dbHandler.route('/lists').post")
+
+        Log("req.body", req.body)
+
         try {
-          
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-          
-
           const dbRes = await new Lists({ parts: req.body.parts }).save()
-          
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists\").post"], "dbRes", dbRes)
-          
+          Log("dbRes", dbRes)
 
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
-          
+          res.json(dbRes)
+        } catch (e){
+          Log("err", e)
+
           res.sendStatus(400)
         }
       })
-      
-      
-      // get, edit, or delete a list:
-      dbHandler.route("/lists/id/:id")
+
+    // get, edit, or delete a list:
+    dbHandler
+      .route("/lists/id/:id")
       .get(async (req, res) => {
-        // send the list at id if there is one:
+        const Log = log.stackLogger("dbHandler.route('/lists/id/:id').get")
+
+        Log("req.params", req.params)
+
         try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-
-
+          // send the list at id if there is one:
           const dbRes = await Lists.findById(req.params.id).exec()
 
+          Log("dbRes", dbRes)
 
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").get"], "req.path", req.path, "dbRes", dbRes)
-          
-
-          if (dbRes != null) res.json(dbRes)
+          if (dbRes) res.json(dbRes)
           else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
+        } catch (e){
+          Log("err", e)
 
           res.sendStatus(400)
         }
       })
       .patch(async (req, res) => {
+        const Log = log.stackLogger("dbHandler.route('/lists/id/:id').patch")
+        
+        Log("req.params", req.params)
+        
         // only edit lists not owned by a user:
-        // note: mongoose only supports limited validation using find and update
         try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").patch"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          const dbRes = await Lists.updateOne(
+            { 
+              _id: req.params.id,
+              user: { $exists: false }
+            },
+            { $set: { parts: req.body.parts } }
+          ).exec()
 
+          Log("dbRes", dbRes)
 
-          const dbRes = await Lists.updateOne({ _id: req.params.id, user: { $exists: false } }, { $set: { parts: req.body.parts } }).exec()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").patch"], "req.path", req.path, "dbRes", dbRes)
-
-
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
+          res.json(dbRes)
+        } catch (e){
+          Log("err", e)
 
           res.sendStatus(400)
         }
       })
       .delete(async (req, res) => {
+        const Log = log.stackLogger("dbHandler.route('/lists/id/:id').delete")
+        
+        Log("req.params", req.params)
+        
         // only delete lists not owned by a user:
         try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").delete"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
+          const dbRes = await Lists.deleteOne({
+            _id: req.params.id,
+            user: { $exists: false }
+          }).exec()
 
+          Log("dbRes", dbRes)
 
-          const dbRes = await Lists.deleteOne({ _id: req.params.id, user: { $exists: false } }).exec()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/lists/id/:id\").delete"], "req.path", req.path, "dbRes", dbRes)
-
-          
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
-
-          res.sendStatus(400)
-        }
-      })
-
-
-      // get, edit, or delete a user:
-      dbHandler.route("/users/id/:id")
-      .get(async (req, res) => {
-        // send the user at id if there is one:
-        try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users/id/:id\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-
-
-          const dbRes = await Users.findById(req.params.id).select("-password").exec()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users/id/:id\").get"], "req.path", req.path, "dbRes", dbRes)
-
-
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e) {
-          console.error(e)
-
-          res.sendStatus(400)
-        }
-      })
-
-
-      // save a new user to db:
-      dbHandler.route("/users")
-      .get(async (req, res) => {
-        // get all users's usernames and ids:
-        try {
-          // skip certain number of newest stories:
-          const offset = Number(req.query.offset ?? 0)
-          // only get limited number of stories:
-          const limit = Number(req.query.limit ?? 1)
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").get"], "offset", offset, "limit", limit, "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-
-
-          const dbRes = await Users.find().select("-password").sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").get"], "dbRes", dbRes)
-
-
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
+          res.json(dbRes)
         } catch (e){
-          console.error(e)
-
-          res.sendStatus(400)
-        }
-      })
-      .post(async (req, res) => {
-        try {
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-
-
-          const dbRes = await new Users(req.body).save()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/users\").post"], "dbRes", dbRes)
-
-
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e){
-          console.error(e)
+          Log("err", e)
 
           res.sendStatus(400)
         }
       })
 
-
-      // news story db:
-      dbHandler.get("/news", async (req, res) => {
-        // find latest news, limit is number of stories, and offset is how many of the latests to skip:
-        try {
-          // skip certain number of newest stories:
-          const offset = Number(req.query.offset ?? 0)
-          // only get limited number of stories:
-          const limit = Number(req.query.limit ?? 1)
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "req.path", req.path, "req.body", req.body, "req.query", req.query, "req.params", req.params)
-
-
-          const dbRes = await News.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
-
-
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "dbRes", dbRes)
-          dbgLog("database.ts", ["if(MONGODB)","dbHandler.route(\"/api/v1/news\").get"], "await News.find({}).sort({ createdAt: -1 })", await News.find({}).sort({ createdAt: -1 }))
-
-
-          if (dbRes != null) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e){
-          console.error(e)
-
-          res.sendStatus(400)
-        }
-      })
-    }
-    catch (err){
-      // something went wrong connecting to DB:
-      console.error(err)
+    // get a user:
+    dbHandler.get("/users/id/:id", async (req, res) => {
+      const Log = log.stackLogger("dbHandler.route('/users/id/:id').get")
       
-      // send that server cannot use db:
-      dbHandler.use("*", (_req, res) => {
-        console.error("\n\tError connecting to MongoDB database!!!!".repeat(10))
-        
-        res.sendStatus(503)
-      })
-    }  
-  })()
+      Log("req.params", req.params)
+      
+      // send the user at id if there is one:
+      try {
+        const dbRes = await Users
+          .findById(req.params.id)
+          .select("-password")
+          .exec()
+
+        Log("dbRes", dbRes)
+
+        if (dbRes) res.json(dbRes)
+        else res.sendStatus(404)
+      } catch (e){
+        Log("err", e)
+
+        res.sendStatus(400)
+      }
+    })
+
+    // get all users:
+    dbHandler.get("/users", async (req, res) => {
+      const Log = log.stackLogger("dbHandler.route('/users').get")
+      
+      Log("req.query", req.query)
+
+      // skip certain number of newest stories:
+      const offset = Number(req.query.offset ?? 0)
+
+      // only get limited number of stories:
+      const limit = Number(req.query.limit ?? 1)
+      
+      Log("offset", offset, "limit", limit)
+      
+      try {
+        // get users:
+        const dbRes = await Users.find()
+          .select("-password")
+          .sort({ createdAt: -1 })
+          .skip(offset)
+          .limit(limit)
+          .exec()
+
+        Log("dbRes", dbRes)
+
+        res.json(dbRes)
+      } catch (e){
+        Log("err", e)
+
+        res.sendStatus(400)
+      }
+    })
+
+    // news story db:
+    dbHandler.get("/news", async (req, res) => {
+      const Log = log.stackLogger("dbHandler.route('/news').get")
+
+      Log("req.query", req.query)
+
+      // skip certain number of newest stories:
+      const offset = Number(req.query.offset ?? 0)
+
+      // only get limited number of stories:
+      const limit = Number(req.query.limit ?? 1)
+
+      Log("offset", offset, "limit", limit)
+
+      try {
+        // find latest news, limit is number of stories, and offset is how many of the latests to skip:
+        const dbRes = await News
+          .find({})
+          .sort({ createdAt: -1 })
+          .skip(offset)
+          .limit(limit)
+          .exec()
+
+        Log("dbRes", dbRes)
+
+        if (dbRes) res.json(dbRes)
+        else res.sendStatus(404)
+      } catch (e){
+        Log("err", e)
+
+        res.sendStatus(400)
+      }
+    })
+  } catch (e){
+    // something went wrong connecting to DB:
+    log("catch await mongoose.connect", "err", e)
+
+    // send that server cannot use db:
+    dbHandler.use((_req, res) => {
+      log(["catch await mongoose.connect", "dbHandler.use"], "err", "\n\tError connecting to MongoDB database!!!!".repeat(10))
+
+      res.sendStatus(503)
+    })
+  }
+})()
+
+export {
+  dbHandler,
+  mongooseConnect,
+  mongooseConnectPromise
 }
-// add error message for no database:
-else {
-  console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(10))
-  
-  // send that server cannot use db:
-  dbHandler.use("*", (_req, res) => {
-    console.error("\n\tERROR! Error: No MongoDB database!!!!".repeat(20))
-    
-    res.sendStatus(503)
-  })
-}
-
-
-export { dbHandler, mongoDBReady, mongooseConnect, mongooseConnectPromise }
-
-/** The mongoose MongoDB connection created and used by the dbHandler Express Router. */
-export const mongooseConnection = mongoose.connection 

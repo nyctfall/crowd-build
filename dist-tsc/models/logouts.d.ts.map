@@ -1,0 +1,1 @@
+{"version":3,"file":"logouts.d.ts","sourceRoot":"","sources":["../../server/models/logouts.ts"],"names":[],"mappings":"AAAA,OAAO,QAAoB,MAAM,UAAU,CAAA;AAG3C,MAAM,WAAW,eAAe;IAC9B,KAAK,EAAE,MAAM,CAAA;IACb,QAAQ,EAAE,IAAI,CAAA;CACf;AAqCD,QAAA,MAAM,OAAO,kDAA2D,CAAA;AAGxE,eAAe,OAAO,CAAA"}

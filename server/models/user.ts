@@ -1,4 +1,4 @@
-import mongoose, { Schema, Types } from "mongoose"
+import mongoose, { Types, Schema, Model, Query, Document } from "mongoose"
 
 
 export interface UserType {
@@ -7,8 +7,12 @@ export interface UserType {
   lists?: Types.ObjectId[]
 }
 
+export interface UserTypeQueryHelpers {
+  byUsername(username: string): Query<any, Document<UserType>> & UserTypeQueryHelpers
+}
 
-const UserSchema = new Schema<UserType>({
+
+const UserSchema = new Schema<UserType, Model<UserType, UserTypeQueryHelpers>>({
     username: {
       type: String,
       required: true
@@ -49,7 +53,8 @@ const UserSchema = new Schema<UserType>({
   }
 )
 
-const Users = mongoose.model<UserType>("User", UserSchema)
+
+const Users = mongoose.model<UserType, Model<UserType, UserTypeQueryHelpers>>("User", UserSchema)
 
 
 export default Users

@@ -1,19 +1,17 @@
-import express from "express";
+import jwt from "jsonwebtoken";
 import Users from "./models/user";
-declare module "express-session" {
-    interface SessionData {
-        token: string;
-    }
-}
+declare const login: import("express-serve-static-core").Router;
 declare global {
+    interface JWTInfo {
+        token: string;
+        jwtPayload: jwt.JwtPayload;
+    }
     namespace Express {
         interface User extends InstanceType<typeof Users> {
         }
+        interface AuthInfo extends JWTInfo {
+        }
     }
 }
-declare const login: import("express-serve-static-core").Router;
-declare const loginSession: express.RequestHandler<import("express-serve-static-core").ParamsDictionary, any, any, import("qs").ParsedQs, Record<string, any>>;
-declare const passportInit: express.Handler;
-declare const passportSession: any;
-export { login, loginSession, passportInit, passportSession };
+export { login };
 //# sourceMappingURL=login.d.ts.map

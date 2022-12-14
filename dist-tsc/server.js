@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ROOT = exports.server = exports.app = void 0;
+exports.PROJECT_ROOT = exports.STATIC_ROOT = exports.server = exports.app = void 0;
 require("dotenv").config({ path: "../.env" });
 const node_path_1 = __importDefault(require("node:path"));
 const express_1 = __importDefault(require("express"));
@@ -17,8 +17,9 @@ const MANIFEST_JSON = require("../dist/manifest.json");
 const app = (0, express_1.default)();
 exports.app = app;
 const PROJECT_ROOT = node_path_1.default.join(__dirname, "../");
+exports.PROJECT_ROOT = PROJECT_ROOT;
 const STATIC_ROOT = node_path_1.default.join(PROJECT_ROOT, "./dist");
-exports.ROOT = STATIC_ROOT;
+exports.STATIC_ROOT = STATIC_ROOT;
 const { PORT = 8080, VITE_PORT = 5173, NODE_ENV } = process.env;
 const log = api_1.dbgLog.fileLogger("server.ts");
 app.use((0, cors_1.default)({
@@ -36,9 +37,6 @@ app.use((req, _res, next) => {
 });
 app.use("/src", assets_router_1.assetsRouter);
 app.use("/api/v1", database_1.dbHandler, login_1.login);
-app.use(login_1.loginSession);
-app.use(login_1.passportInit);
-app.use(login_1.passportSession);
 app.get("/*", (req, res) => {
     const mapping = Object.values(MANIFEST_JSON).filter(chunk => chunk.isEntry);
     const VITE_DEV = `
@@ -57,17 +55,18 @@ app.get("/*", (req, res) => {
         production: NODE_ENV === "production",
         VITE_DEV,
         js: mapping.map(entryChunk => entryChunk.file),
-        css: mapping.filter(entryChunk => "css" in entryChunk).map(entryChunk => entryChunk.css).flat(Infinity)
+        css: mapping
+            .filter(entryChunk => "css" in entryChunk)
+            .map(entryChunk => entryChunk.css)
+            .flat(Infinity)
     });
 });
 app.use(((err, _req, res, _next) => {
-    console.error(err);
+    log("Error Handling Middleware", "error.name", err.name, "error.message", err.message, "error.cause", err.cause, "error.stack", err.stack);
     res.sendStatus(500);
 }));
 const server = app.listen(PORT, () => {
-    console.log(`\n\tApp running in port ${PORT}`);
-    console.log(`\n\tNODE_ENV MODE: "${process.env.NODE_ENV === "production" ? "production" : "developement"}"`);
-    console.log(`\n\t> Local: http://localhost:${PORT}/`);
+    console.log(`\n\tApp running in port ${PORT}`, `\n\n\tNODE_ENV MODE: "${process.env.NODE_ENV === "production" ? "production" : "developement"}"`, `\n\n\t> Local: http://localhost:${PORT}/`);
 });
 exports.server = server;
 //# sourceMappingURL=server.js.map
