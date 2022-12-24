@@ -1,57 +1,99 @@
 import { Button } from "react-bootstrap"
+import { dbgLog } from "~types/logger"
+import type { PCPartInfo } from "~types/api"
 import reactLogo from "../assets/react.svg"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
-import { dbgLog, PCPartInfo } from "~types/api"
-import { addMyListPart, removeMyListPart } from "../redux-stuff/reducers/myList"
+import { updateOneList } from "../redux-stuff/reducers/listsCache"
 
+// debugging logger:
+const log = dbgLog.fileLogger("PCPart.tsx")
 
 /**
  * Display PC part info from info object.
- * 
+ *
  * @param {PCPartInfo} props The object of pc part info.
- * @param {boolean} props.noToggle Don't display add to list button.
+ * @param {?boolean} props.noToggle Don't display add to list button.
+ * @param {?Function} props.onClick Additional handler for "add/remove from list" button.
  */
-export default function PCPart(info: PCPartInfo & { noToggle?: boolean }){
+export default function PCPart(props: PCPartInfo & { noToggle?: boolean; onClick?: Function }) {
+  const Log = log.stackLogger("PCPart")
+
   const dispatch = useAppDispatch()
-  
-  const list = useAppSelector((state) => state.myList)
-  
 
-  const { _id: id, img = reactLogo, name = "product image", oem: manufacturer, model, MSRP, type, typeInfo } = info
-  
-  const onList = list.ids.includes(id)
+  const {
+    noToggle,
+    onClick,
+    _id: partId,
+    img = reactLogo,
+    name = "product image",
+    oem,
+    model,
+    MSRP,
+    type,
+    typeInfo
+  } = props
 
+  const {
+    myListId: { id: myListId },
+    listsCache
+  } = useAppSelector(state => state)
 
-  const handleClick = () => {
-    dbgLog("PCPart.tsx", ["PCPart","handleClick"], "onList", onList, "info", info, "list", list)
+  // array of parts in myList:
+  const myListParts = listsCache.entities[myListId]?.parts
 
-    dispatch(!onList ? addMyListPart(info) : removeMyListPart(id))
+  // check if part is in myList:
+  const onList = !!myListParts?.includes(partId)
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    // prettier-ignore
+    Log.stackLoggerInc("handleClick")(
+      "info", props,
+      "myListId", myListId,
+      "lists", listsCache,
+      "onList", onList,
+      "myListParts", myListParts
+    )
+
+    if (myListParts)
+      dispatch(
+        updateOneList({
+          id: myListId,
+          changes: {
+            parts: onList
+              ? // remove if already on list:
+                myListParts.filter(id => partId !== id)
+              : // add part to list:
+                [...myListParts, partId]
+          }
+        })
+      )
+
+    // call parent handler:
+    onClick?.(e)
   }
 
-
   return (
-    <tr>
-      <td>
-        <img 
-          src={img || "src/assets/react.svg"} 
-          alt={name} 
-          className="d-inline-block"
-        />
+    <tr className="py-auto">
+      <td style={{ height: "max(15vh, 4rem)", width: "max(15vh, 4rem)" }}>
+        <img src={img || "src/assets/react.svg"} alt={name} className="d-inline-block h-100" />
       </td>
       <td>{type}</td>
-      <td>{manufacturer}</td>
+      <td>{oem}</td>
       <td>{model}</td>
       <td>${MSRP}</td>
 
-      { typeInfo ? /** @todo Accordion */"" : ""}
+      {/** @todo Accordion */}
+      {/* {typeInfo ?  "" : ""} */}
 
-      {info.noToggle ? "" :
+      {noToggle ? (
+        ""
+      ) : (
         <td>
           <Button variant={!onList ? "success" : "danger"} onClick={handleClick}>
             {!onList ? "Add" : "Remove"}
           </Button>
         </td>
-      }
+      )}
     </tr>
   )
 }

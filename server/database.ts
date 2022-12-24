@@ -1,6 +1,6 @@
 import express from "express"
 import mongoose from "mongoose"
-import { dbgLog, UnPromise } from "~types/api"
+import { dbgLog, HTTPStatusCode } from "~types/api"
 import Parts from "./models/part"
 import Lists from "./models/list"
 import Users from "./models/user"
@@ -15,42 +15,38 @@ import News from "./models/news"
  */
 const dbHandler = express.Router()
 
-const {
-  MONGODB = "mongodb://127.0.0.1:27017",
-  REDIS
-} = process.env
+const { MONGODB = "mongodb://127.0.0.1:27017", REDIS } = process.env
 
 // debugging logger:
 const log = dbgLog.fileLogger("database.ts")
 
 /**
- * Promise for mongoose connection. 
+ * Promise for mongoose connection.
  */
 let mongooseConnectPromise: ReturnType<typeof mongoose.connect>
 
 /**
- * Resolved promise value from mongoose connection. 
+ * Resolved promise value from mongoose connection.
  */
-let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
-
+let mongooseConnect: Awaited<typeof mongooseConnectPromise>
 ;(async () => {
   // add error message for no database:
-  if (!MONGODB){
-    log("MONGODB == false", "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(10))
-  
+  if (!MONGODB) {
+    log.error("MONGODB == false", "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(10))
+
     // send that server cannot use db:
     return dbHandler.use((_req, res) => {
-      log(["MONGODB == false", "dbHandler.use"], "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(20))
-  
-      res.sendStatus(503)
+      log.error(["MONGODB == false", "dbHandler.use"], "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(20))
+
+      res.sendStatus(HTTPStatusCode["Service Unavailable"])
     })
   }
-    
+
   // mongodb server:
   try {
     // connect to DB:
     mongooseConnectPromise = mongoose.connect(MONGODB)
-    
+
     // wait for connection to finish:
     mongooseConnect = await mongooseConnectPromise
 
@@ -79,7 +75,7 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
         // skip certain number of newest stories:
         const offset = Number(req.query.offset ?? 0)
         // only get limited number of stories:
-        const limit = Number(req.query.limit ?? 1)
+        const limit = Number(req.query.limit ?? Infinity)
 
         // prettier-ignore
         Log(
@@ -113,29 +109,31 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
           if (typeInfo) dbQuery.byTypeInfo(typeInfo)
 
           Log("dbQuery", dbQuery)
-          
+
           const dbRes = await dbQuery.exec()
 
           Log("dbRes", dbRes)
 
           // if there was no error, return result, which could be an empty array:
-          res.json(dbRes)
-        } catch (e){
-          Log("err", e)
+          if (dbRes.length > 0) res.json(dbRes)
+          // if empty array, not parts were found:
+          else res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
 
           // the db threw an error, somthing was wrong:
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
 
     dbHandler
       .route("/parts/id/:id")
-      /** @todo User suggested/voted parts POST, PATCH, DELETE? */
+      /** @todo User suggested/voted parts POST, PATCH, PUT/DELETE? */
       .get(async (req, res) => {
         const Log = log.stackLogger("dbHandler.get('/parts/id/:id')")
 
         Log("req.params", req.params)
-        
+
         try {
           // find one part by its id:
           const dbRes = await Parts.findById(req.params.id).exec()
@@ -143,11 +141,11 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
           Log("dbRes", dbRes)
 
           if (dbRes) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e){
-          Log("err", e)
+          else res.sendStatus(HTTPStatusCode["Not Found"])
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
 
@@ -163,27 +161,24 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
         const offset = Number(req.query.offset ?? 0)
 
         // only get limited number of stories:
-        const limit = Number(req.query.limit ?? 1)
-        
+        const limit = Number(req.query.limit ?? Infinity)
+
         Log("offset", offset, "limit", limit)
 
         try {
           // get lists:
-          const dbRes = await Lists
-            .find()
-            .sort({ createdAt: -1 })
-            .skip(offset)
-            .limit(limit)
-            .exec()
+          const dbRes = await Lists.find().sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
 
           Log("dbRes", dbRes)
 
           // if there was no error, return result, which could be an empty array:
-          res.json(dbRes)
-        } catch (e){
-          Log("err", e)
+          if (dbRes.length > 0) res.json(dbRes)
+          // if empty array, not parts were found:
+          else res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
       // save a list to db:
@@ -197,11 +192,11 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
 
           Log("dbRes", dbRes)
 
-          res.json(dbRes)
-        } catch (e){
-          Log("err", e)
+          res.status(HTTPStatusCode["Created"]).json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
 
@@ -220,22 +215,22 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
           Log("dbRes", dbRes)
 
           if (dbRes) res.json(dbRes)
-          else res.sendStatus(404)
-        } catch (e){
-          Log("err", e)
+          else res.sendStatus(HTTPStatusCode["Not Found"])
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
       .patch(async (req, res) => {
         const Log = log.stackLogger("dbHandler.route('/lists/id/:id').patch")
-        
+
         Log("req.params", req.params)
-        
+
         // only edit lists not owned by a user:
         try {
           const dbRes = await Lists.updateOne(
-            { 
+            {
               _id: req.params.id,
               user: { $exists: false }
             },
@@ -245,17 +240,17 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
           Log("dbRes", dbRes)
 
           res.json(dbRes)
-        } catch (e){
-          Log("err", e)
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
       .delete(async (req, res) => {
         const Log = log.stackLogger("dbHandler.route('/lists/id/:id').delete")
-        
+
         Log("req.params", req.params)
-        
+
         // only delete lists not owned by a user:
         try {
           const dbRes = await Lists.deleteOne({
@@ -266,54 +261,52 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
           Log("dbRes", dbRes)
 
           res.json(dbRes)
-        } catch (e){
-          Log("err", e)
+        } catch (e) {
+          Log.error("err", e)
 
-          res.sendStatus(400)
+          res.sendStatus(HTTPStatusCode["Bad Request"])
         }
       })
 
     // get a user:
     dbHandler.get("/users/id/:id", async (req, res) => {
       const Log = log.stackLogger("dbHandler.route('/users/id/:id').get")
-      
+
       Log("req.params", req.params)
-      
+
       // send the user at id if there is one:
       try {
-        const dbRes = await Users
-          .findById(req.params.id)
-          .select("-password")
-          .exec()
+        const dbRes = await Users.findById(req.params.id).select("-password").exec()
 
         Log("dbRes", dbRes)
 
         if (dbRes) res.json(dbRes)
-        else res.sendStatus(404)
-      } catch (e){
-        Log("err", e)
+        else res.sendStatus(HTTPStatusCode["Not Found"])
+      } catch (e) {
+        Log.error("err", e)
 
-        res.sendStatus(400)
+        res.sendStatus(HTTPStatusCode["Bad Request"])
       }
     })
 
     // get all users:
     dbHandler.get("/users", async (req, res) => {
       const Log = log.stackLogger("dbHandler.route('/users').get")
-      
+
       Log("req.query", req.query)
 
       // skip certain number of newest stories:
       const offset = Number(req.query.offset ?? 0)
 
       // only get limited number of stories:
-      const limit = Number(req.query.limit ?? 1)
-      
+      const limit = Number(req.query.limit ?? Infinity)
+
       Log("offset", offset, "limit", limit)
-      
+
       try {
         // get users:
-        const dbRes = await Users.find()
+        const dbRes = await Users
+          .find()
           .select("-password")
           .sort({ createdAt: -1 })
           .skip(offset)
@@ -322,11 +315,14 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
 
         Log("dbRes", dbRes)
 
-        res.json(dbRes)
-      } catch (e){
-        Log("err", e)
+        // if there was no error, return result, which could be an empty array:
+        if (dbRes.length > 0) res.json(dbRes)
+        // if empty array, not parts were found:
+        else res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+      } catch (e) {
+        Log.error("err", e)
 
-        res.sendStatus(400)
+        res.sendStatus(HTTPStatusCode["Bad Request"])
       }
     })
 
@@ -346,38 +342,35 @@ let mongooseConnect: UnPromise<typeof mongooseConnectPromise>
 
       try {
         // find latest news, limit is number of stories, and offset is how many of the latests to skip:
-        const dbRes = await News
-          .find({})
-          .sort({ createdAt: -1 })
-          .skip(offset)
-          .limit(limit)
-          .exec()
+        const dbRes = await News.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
 
         Log("dbRes", dbRes)
 
-        if (dbRes) res.json(dbRes)
-        else res.sendStatus(404)
-      } catch (e){
-        Log("err", e)
+        // if there was no error, return result, which could be an empty array:
+        if (dbRes.length > 0) res.json(dbRes)
+        // if empty array, not parts were found:
+        else res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+      } catch (e) {
+        Log.error("err", e)
 
-        res.sendStatus(400)
+        res.sendStatus(HTTPStatusCode["Bad Request"])
       }
     })
-  } catch (e){
+  } catch (e) {
     // something went wrong connecting to DB:
-    log("catch await mongoose.connect", "err", e)
+    log.error("catch await mongoose.connect", "err", e)
 
     // send that server cannot use db:
     dbHandler.use((_req, res) => {
-      log(["catch await mongoose.connect", "dbHandler.use"], "err", "\n\tError connecting to MongoDB database!!!!".repeat(10))
+      log.error(
+        ["catch await mongoose.connect", "dbHandler.use"],
+        "err",
+        "\n\tError connecting to MongoDB database!!!!".repeat(10)
+      )
 
-      res.sendStatus(503)
+      res.sendStatus(HTTPStatusCode["Service Unavailable"])
     })
   }
 })()
 
-export {
-  dbHandler,
-  mongooseConnect,
-  mongooseConnectPromise
-}
+export { dbHandler, mongooseConnect, mongooseConnectPromise }

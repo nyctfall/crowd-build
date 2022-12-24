@@ -1,21 +1,27 @@
 import { Button, Container } from "react-bootstrap"
 import { LinkContainer } from "react-router-bootstrap"
-import PCPartList from "../components/PCPartList"
+import { dbgLog } from "~types/logger"
 import { useAppSelector } from "../redux-stuff/hooks"
-import type { PCPartInfo } from "~types/api"
 import SearchListDB from "../components/SearchListDB"
 import CreateListButton from "../components/CreateListButton"
+import PCPartListId from "../components/PCPartLIstId"
 
+// debugging logger:
+const log = dbgLog.fileLogger("MyList.tsx")
 
 /**
  * The main hub for most list operations, edit local myList, save local myList the database, search for database lists, use, edit, and delete lists from database.
  */
-export default function MyList(){
-  const myListState = useAppSelector(state => state.myList)
+export default function MyList() {
+  const Log = log.stackLogger("MyList")
 
-  const myList = Object.values(myListState.entities).filter(part => part != undefined) as PCPartInfo[]
-  
-  
+  const {
+    myListId: { id: myListId },
+    listsCache
+  } = useAppSelector(state => state)
+
+  const myListParts = listsCache.entities[myListId]?.parts
+
   return (
     <>
       <h1>My List</h1>
@@ -24,20 +30,23 @@ export default function MyList(){
         <SearchListDB />
       </Container>
 
-      {myList.length > 0 ? <>
-          <PCPartList list={myList} />
+      {myListParts?.length ? (
+        <>
+          <PCPartListId partIds={myListParts} />
 
           <Container fluid className="mw-100 m-3 mx-auto">
             <CreateListButton />
           </Container>
         </>
-        : <>
+      ) : (
+        <>
           <h2>Try searching for parts to add to your build!</h2>
         </>
-      }
+      )}
 
       <LinkContainer to="/database" className="m-5 mx-auto">
-        <Button variant={myList.length > 0 ? "secondary" : "info"}>PC Part Database</Button>
+        {/** @todo convert to stateful button */}
+        <Button variant={myListParts?.length ? "secondary" : "info"}>PC Part Database</Button>
       </LinkContainer>
     </>
   )

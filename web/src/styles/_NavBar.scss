@@ -1,7 +1,6 @@
 // import all of Bootstrap's CSS
 @use "~bootstrap/scss/bootstrap.scss" as *;
 
-
 $only-sm-logo: 240px;
 
 @media (max-width: calc(map-get($grid-breakpoints, md) - 0.02px)) and (min-width: $only-sm-logo) {
@@ -21,7 +20,6 @@ header .navbar-toggler {
   border-width: 0px;
 }
 
-
 @media (max-width: ($only-sm-logo - 0.02px)) {
   #nav-logo-brand {
     margin-left: 0px;
@@ -35,18 +33,18 @@ header .navbar-toggler {
     margin-left: var(--bs-navbar-brand-margin-end);
     margin-right: 0rem !important;
   }
-  
+
   header {
     .navbar-toggler {
       --bs-navbar-toggler-focus-width: 1px;
-      padding-inline: 0rem; 
+      padding-inline: 0rem;
     }
   }
 }
 
-
 @media (min-width: 240px) {
-  #company-dropdown-name, .company-dropdown-name {
+  #company-dropdown-name,
+  .company-dropdown-name {
     display: none;
   }
 }

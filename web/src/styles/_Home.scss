@@ -1,7 +1,6 @@
 // import all of Bootstrap's CSS
 @use "~bootstrap/scss/bootstrap.scss" as *;
 
-
 // todo fix this mess of css and make it work using only one flex box with
 #headliner {
   display: flex;
@@ -11,22 +10,26 @@
   min-width: 100%;
   padding: 0%;
 
-  &, & > *, & > * > * {
+  &,
+  & > *,
+  & > * > * {
     display: flex;
   }
 
-  &, & > *, & > * > * {
+  &,
+  & > *,
+  & > * > * {
     transition-property: all, flex, flex-basis, flex-grow, flex-shrink;
     transition-duration: 2s;
     transition-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
     flex: 10%;
   }
-  
+
   & > * {
     flex-direction: row;
     margin: 0;
   }
-  
+
   & > * > * {
     margin: 0;
     z-index: 0;
@@ -35,21 +38,21 @@
     justify-content: center;
     overflow: hidden;
   }
-  
+
   & > *:hover {
     flex: 80%;
   }
-  
+
   & > * > *:hover {
     flex: 80%;
     z-index: 1;
   }
-  
-  &:hover > *:not(:hover), & > *:hover > *:not(:hover) {
+
+  &:hover > *:not(:hover),
+  & > *:hover > *:not(:hover) {
     overflow: hidden;
   }
 }
-
 
 // width is bootstrap md breakpoint
 @media (max-width: calc(map-get($grid-breakpoints, md) - 0.02px)), (max-height: 720px) {

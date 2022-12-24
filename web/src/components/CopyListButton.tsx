@@ -1,82 +1,140 @@
-import { useState, useEffect } from "react"
-import { Button, Spinner } from "react-bootstrap"
+import { useEffect } from "react"
+import { dbgLog } from "~types/logger"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
-import { setAllMyListParts } from "../redux-stuff/reducers/myList"
-import useCacheList from "../hooks/useCacheList"
-import { dbgLog, PCPartInfo } from "~types/api"
+import { updateOneList } from "../redux-stuff/reducers/listsCache"
+import useLazyCacheList from "../hooks/useLazyCacheList"
+import StatefulButton from "./StatefulButton"
 
+// debugging logger:
+const log = dbgLog.fileLogger("CopyListButton.tsx")
 
 /**
  * Add all parts on target list to myList.
- * 
+ *
  * @param {string} props.id The database or entity id of the list to use.
+ * @param {?Function} props.onClick Additional onClick handler.
+ * @param {?Function} props.onFinish Handler for the onClick RTK Query Action.
  */
-export default function CopyListButton({ id }: { id: string }){
+export default function CopyListButton({
+  id,
+  onClick,
+  onFinish
+}: {
+  id: string
+  onClick?: Parameters<typeof StatefulButton>[0]["onClick"]
+  onFinish?: (arg: Awaited<ReturnType<ReturnType<typeof useLazyCacheList>["trigger"]>>) => any
+}) {
+  const Log = log.stackLogger("CopyListButton")
+
   const dispatch = useAppDispatch()
 
-  const { myList, partsDB, allLists } = useAppSelector(state => state)
+  const state = useAppSelector(state => state)
+  const {
+    myListId: { id: myListId },
+    partsCache,
+    listsCache
+  } = state
 
-  
   // myList as array of part ids:
-  const list = (Object.values(myList.entities)
-  .filter(part => part != undefined) as PCPartInfo[])
-  .map(({ _id }) => _id)
-  
-  // no-op if target list and myList have all the same parts:
-  const isIdentical = list.length === allLists.entities[id]?.parts.length && list.every(partId => allLists.entities[id]?.parts.includes(partId))
+  const myList = listsCache.entities[myListId]?.parts
 
-  // control copying state:
-  const [copyList, setCopyList] = useState(false)
-  
   // get list from id, should be from cache or fetch from database:
-  const listCache = useCacheList(id, { skip: copyList, populate: true })
+  const listCache = useLazyCacheList()
 
-  const { 
-    data: targetList, 
-    rtkQuery: { isError: isErrorList }, 
-    populated: { data: targetParts, rtkQuery: { isError: isErrorParts } } 
+  const {
+    trigger,
+    data: targetList,
+    rtkQuery: { isError: isErrorList, isFetching },
+    populated: {
+      rtkQuery: { isError: isErrorParts }
+    }
   } = listCache
 
-  
+  // list to copy:
+  const targetListParts = targetList?.parts
+
+  // no-op if target list and myList have all the same parts:
+  const isIdentical =
+    myList &&
+    targetListParts &&
+    myList.length === targetListParts.length &&
+    myList.every(partId => targetListParts.includes(partId))
+
   // replace myList with target list:
   useEffect(() => {
-    dbgLog("CopyListButton.tsx", ["CopyListButton","useEffect(,[copyList, targetParts])"], "copyList", copyList, "targetParts", targetParts, "listCache", listCache, "myList", myList, "allLists", allLists, "partsDB", partsDB)
-    
-    if (copyList && targetParts){
-      // get target list by id, then add all of it's parts to overwrite myList:
-      dispatch(setAllMyListParts(targetParts))
-      
-      // disable copying of un-targeted list's parts to my list:
-      setCopyList(false)
-    }
-  }, [copyList, /* targetParts */])
-  
-  
-  const handleClick = () => {
-    dbgLog("CopyListButton.tsx", ["CopyListButton","handleClick"], "copyList", copyList, "targetParts", targetParts, "listCache", listCache, "myList", myList, "allLists", allLists, "partsDB", partsDB)
+    // prettier-ignore
+    Log.stackLoggerInc("useEffect(,[targetList])")(
+      "targetListParts", targetListParts,
+      "targetList", targetList,
+      "myList", myList,
+      "isIdentical", isIdentical,
+      "listCache", listCache,
+      "myListId", myListId,
+      "state.myListId", state.myListId,
+      "lists", listsCache,
+      "partsDB", partsCache
+    )
 
-    // enable copying of all target list's parts to overwrite myList:
-    setCopyList(true)
+    // get target list by id, then add all of it's parts to overwrite myList:
+    if (targetListParts)
+      dispatch(
+        updateOneList({
+          id: myListId,
+          changes: {
+            parts: targetListParts
+          }
+        })
+      )
+  }, [targetList])
+
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const log = Log.stackLoggerInc("handleClick")
+
+    // prettier-ignore
+    log(
+      "targetListParts", targetListParts,
+      "targetList", targetList,
+      "myList", myList,
+      "isIdentical", isIdentical,
+      "listCache", listCache,
+      "myListId", myListId,
+      "state.myListId", state.myListId,
+      "lists", listsCache,
+      "partsDB", partsCache
+    )
+
+    // get target list by id, then add all of it's parts to overwrite myList,
+    const listCacheRes = await trigger({ id }, true)
+
+    log("listCacheRes", listCacheRes)
+
+    if (listCacheRes.list)
+      dispatch(
+        updateOneList({
+          id: myListId,
+          changes: {
+            parts: listCacheRes.list.parts
+          }
+        })
+      )
+
+    // call parent handler:
+    onClick?.(e)
+    onFinish?.(listCacheRes)
   }
 
-
   return (
-    <>
-      <Button 
-        variant={isIdentical ? "outline-secondary" : "info"} 
-        disabled={isIdentical}
-        onClick={handleClick}
-      >
-        {copyList && !targetList && !targetParts ? <>
-            Loading...<Spinner animation="border" />
-          </>
-          : (isErrorList || isErrorParts) && !targetParts ?
-            "Error Copying List"
-            : isIdentical ? 
-              "Same As My List"
-              : "Copy To My List"
-        }
-      </Button>
-    </>
+    <StatefulButton
+      text="Copy To My List"
+      variant={"info"}
+      textLoading="Loading..."
+      isLoading={isFetching}
+      textUnclickable="Same As My List"
+      isUnclickable={isIdentical}
+      variantUnclickable={"outline-secondary"}
+      textError="Error Copying List"
+      isError={isErrorList || isErrorParts}
+      onClick={handleClick}
+    />
   )
 }

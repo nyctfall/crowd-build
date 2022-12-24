@@ -1,11 +1,16 @@
-import { Carousel, Container } from "react-bootstrap"
 import { Link } from "react-router-dom"
+import { Carousel, Container } from "react-bootstrap"
+import { dbgLog } from "~types/logger"
 
+const log = dbgLog.fileLogger("Home.tsx")
 
 /**
- * 
+ * Home page with pc part and build pics.
  */
 export default function Home() {
+  const Log = log.stackLogger("Home")
+
+  /** @todo make DB query to get PC part pics, and link to part page */
   const imgs = [
     "https://c1.neweggimages.com/ProductImageCompressAll1280/14-932-550-12.jpg",
     "https://c1.neweggimages.com/ProductImageOriginal/19-113-771-S02.jpg",
@@ -14,7 +19,6 @@ export default function Home() {
     "https://c1.neweggimages.com/ProductImageCompressAll1280/14-202-417-V01.jpg",
     "https://c1.neweggimages.com/ProductImageOriginal/83-360-311-01.jpg",
     "https://c1.neweggimages.com/ProductImage/83-360-132-08.jpg",
-    "https://c1.neweggimages.com/ProductImage/83-360-255-01.jpg",
     "https://c1.neweggimages.com/ProductImage/83-360-241-01.jpg",
     "https://c1.neweggimages.com/ProductImage/83-360-310-01.jpg",
     "https://c1.neweggimages.com/ProductImage/83-360-250-01.jpg",
@@ -23,60 +27,50 @@ export default function Home() {
     "https://c1.neweggimages.com/ProductImage/83-360-292-07.jpg"
   ]
 
-
   return (
-    <>
+    <>{/** @todo improve it to be dynamicly loaded from most popular parts */}
       <h1>Home</h1>
 
-      <Carousel 
-        as="section" 
-        id="headliner-mini" 
-        variant="dark" 
-        interval={2500} 
-        pause={false}
-      >
-        {imgs.map((imgsrc, i) => 
+      <Carousel as="section" id="headliner-mini" variant="dark" interval={2500} pause={false}>
+        {imgs.map((imgsrc, i) => (
           <Carousel.Item key={i} as="article">
+            <div
+              style={{
+                backgroundImage: `url("${imgsrc}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                width: "min(75vh, 100vw)",
+                height: "min(75vh, 100vw)"
+              }}
+              className="mx-auto"
+            ></div>
 
-            <div 
-              style={{ 
-                backgroundImage: `url("${imgsrc}")`, 
-                backgroundSize: "cover", 
-                backgroundPosition: "center", 
-                width: "min(75vh, 100vw)", 
-                height: "min(75vh, 100vw)" 
-              }} 
-              className="mx-auto">
-            </div>
-            
             {/* <img src={imgsrc} alt="user description" className="w-100 h-100" /> */}
-            
+
             <Link to="/database">
-              <Carousel.Caption className="text-bg-light opacity-75">
-                User Description
-              </Carousel.Caption>
+              <Carousel.Caption className="text-bg-light opacity-75">User Description</Carousel.Caption>
             </Link>
           </Carousel.Item>
-        )}
+        ))}
       </Carousel>
 
       <Container as="section" id="headliner" fluid>
-        {[0,3,6].map((x, i) => 
+        {[0, 3, 6].map((x, i) => (
           <div key={i}>
-            {imgs.slice(x,x+3).map((imgsrc, i) =>
-              <div 
-                key={i} 
-                style={{ 
-                  backgroundImage: `url("${imgsrc}")`, 
-                  backgroundSize: "cover", 
-                  backgroundPosition: "center" 
+            {imgs.slice(x, x + 3).map((imgsrc, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundImage: `url("${imgsrc}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center"
                 }}
               >
                 <Link to="/database" className="w-100 h-100"></Link>
               </div>
-            )}
+            ))}
           </div>
-        )}
+        ))}
       </Container>
     </>
   )

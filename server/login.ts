@@ -1,11 +1,9 @@
 import express from "express"
-import session from "express-session"
-import mongoStore from "connect-mongo"
 import passport from "passport"
 import passportJWT from "passport-jwt"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
-import { dbgLog, SessionType, UnPromise } from "~types/api"
+import { dbgLog, HTTPStatusCode, SessionType } from "~types/api"
 import { mongooseConnectPromise } from "./database"
 import Users, { UserType } from "./models/user"
 import Lists from "./models/list"
@@ -49,23 +47,27 @@ const maxAge = 1000 * 60 * 10
 /**
  * JWT signing async Promise.
  */
-const jwtSign = (payload: jwt.JwtPayload & { id: string }) => new Promise<string>((resolve, reject) => jwt.sign(
-  payload,
-  SECRET,
-  {
-    expiresIn: `${maxAge}ms`,
-    subject: payload.id
-  }, 
-  (err, token) => err ? reject(err) : resolve(token as string)
-))
+const jwtSign = (payload: jwt.JwtPayload & { id: string }) =>
+  new Promise<string>((resolve, reject) =>
+    jwt.sign(
+      payload,
+      SECRET,
+      {
+        expiresIn: `${maxAge}ms`,
+        subject: payload.id
+      },
+      (err, token) => (err ? reject(err) : resolve(token as string))
+    )
+  )
 
 /**
  * JWT 'jwt' cookie setting helper.
  */
-const setJWTCookie = (res: express.Response, token: string) => res.cookie("jwt", token, {
-  expires: new Date(Date.now() + maxAge),
-  httpOnly: false
-})
+const setJWTCookie = (res: express.Response, token: string) =>
+  res.cookie("jwt", token, {
+    expires: new Date(Date.now() + maxAge),
+    httpOnly: false
+  })
 
 /**
  * bcrypt helper for hashing passwords.
@@ -87,10 +89,10 @@ const validateUserPass = (reqBody: express.Request["body"]) => {
   // validate input, type:
   if (typeof username !== "string") throw Error("username not string")
   if (typeof password !== "string") throw Error("password not string")
-  
+
   // validate input, valid characters, no ASCII control chars:
-  if (username.match(/([^\u0020-\uFFFF])+/gui)) throw Error("username has invalid ASCII control characters")
-  if (password.match(/([^\u0020-\uFFFF])+/gui)) throw Error("password has invalid ASCII control characters")
+  if (username.match(/([^\u0020-\uFFFF])+/giu)) throw Error("username has invalid ASCII control characters")
+  if (password.match(/([^\u0020-\uFFFF])+/giu)) throw Error("password has invalid ASCII control characters")
 
   return {
     username,
@@ -124,24 +126,24 @@ const logoutJWT = (token: string) => {
 /**
  * JWT token extractor from Authorization header:
  */
-const authHeaderExtractor: passportJWT.JwtFromRequestFunction = (req) => {
+const authHeaderExtractor: passportJWT.JwtFromRequestFunction = req => {
   const Log = log.stackLogger("authHeaderExtractor")
-  
+
   Log("req.headers", req.headers, "req.headers.authorization", req.headers?.authorization)
-  
+
   // search request auth header for token:
-  if (req && req.headers && req.headers.authorization){
+  if (req && req.headers && req.headers.authorization) {
     // split on space for jwt in auth params:
     const auth = req.headers.authorization?.split(/\s+/)
-    
+
     // no token found in auth header:
     if (auth.length < 2) return null
-    
+
     // jwt from header:
     let token = auth[1]
-    
+
     Log("auth", auth, "token", token, "jwt", jwt.decode(token, { complete: true }))
-    
+
     // token is in Auth header:
     return token
   }
@@ -153,17 +155,17 @@ const authHeaderExtractor: passportJWT.JwtFromRequestFunction = (req) => {
 /**
  * JWT token extractor from a Cookie:
  */
-const cookieExtractor: passportJWT.JwtFromRequestFunction = (req) => {
+const cookieExtractor: passportJWT.JwtFromRequestFunction = req => {
   const Log = log.stackLogger("cookieExtractor")
-  
+
   Log("req.cookies", req.cookies)
-  
+
   // search request cookies for token:
-  if (req && req.cookies && typeof req.cookies["jwt"] === "string"){
+  if (req && req.cookies && typeof req.cookies["jwt"] === "string") {
     const token = req.cookies["jwt"]
-    
+
     Log("token", token, "jwt", jwt.decode(token, { complete: true }))
-    
+
     // token is in cookie:
     return token
   }
@@ -180,7 +182,7 @@ const JWTExtractor = passportJWT.ExtractJwt.fromExtractors([authHeaderExtractor,
 /**
  * Passport-JWT strategy options.
  */
-const JWTStratOpts: passportJWT.StrategyOptions = { 
+const JWTStratOpts: passportJWT.StrategyOptions = {
   secretOrKey: SECRET,
   passReqToCallback: true,
   jwtFromRequest: JWTExtractor
@@ -189,7 +191,11 @@ const JWTStratOpts: passportJWT.StrategyOptions = {
 /**
  * Passport-JWT verify callback.
  */
-const JWTStratVerify: passportJWT.VerifyCallbackWithRequest = async (req, jwtPayload: jwt.JwtPayload, done: passportJWT.VerifiedCallback) => {
+const JWTStratVerify: passportJWT.VerifyCallbackWithRequest = async (
+  req,
+  jwtPayload: jwt.JwtPayload,
+  done: passportJWT.VerifiedCallback
+) => {
   const Log = log.stackLogger("JWTStratVerifyCb")
 
   // get token to check if token is logged out:
@@ -200,45 +206,44 @@ const JWTStratVerify: passportJWT.VerifyCallbackWithRequest = async (req, jwtPay
   try {
     // make sure token was not logged out previously:
     const dbRes = await Logouts.findOne({ token }).exec()
-    
+
     Log("Logouts dbRes", dbRes)
-  
+
     // token was logged out and is invalid:
     if (dbRes) return done(null, false)
-  } catch (e){
-    Log("Logouts.findOne error", e)
+  } catch (e) {
+    Log.error("Logouts.findOne error", e)
 
     // error searching db to check if token is logged out:
     done(e, false)
   }
 
-
   try {
     // find user:
     const user = await Users.findById(jwtPayload.id).exec()
-    
+
     Log("user", user)
-  
+
     // user found:
     if (user) return done(null, user, { token, jwtPayload })
 
     try {
-      // user doesn't exist, logout the token for non-existant user:  
+      // user doesn't exist, logout the token for non-existant user:
       const dbRes = await logoutJWT(token)
-      
+
       Log("new Logouts dbRes", dbRes)
-      
+
       // no user found:
       done(null, false)
-    } catch (e){
-      Log("new Logouts error", e)
+    } catch (e) {
+      Log.error("new Logouts error", e)
 
       // error logging out token for user that doesn't exist:
       done(e, false)
     }
   } catch (e) {
-    Log("Users.findOne error", e)
-  
+    Log.error("Users.findOne error", e)
+
     // error finding user:
     done(e, false)
   }
@@ -262,16 +267,16 @@ passport.use("jwt", JWTStrat)
 // serialize user to express session:
 passport.serializeUser(async (user, done) => {
   log("passport.serializeUser", "user", user)
-  
+
   done(null, user.id)
 })
 
 // deserialize user from express session:
 passport.deserializeUser(async (id: string, done) => {
   const Log = log.stackLogger("passport.deserializeUser")
-  
+
   Log("id", id)
-  
+
   try {
     // parse json, will throw if undefined:
     const user = await Users.findById(id).exec()
@@ -283,107 +288,61 @@ passport.deserializeUser(async (id: string, done) => {
 
     // user not found:
     done(null, false)
-  } catch (e){
-    Log("Users.findById error", e)
+  } catch (e) {
+    Log.error("Users.findById error", e)
 
     done(e, false)
   }
 })
 
 // requires db:
-mongooseConnectPromise.then((mongoose) => {
-  console.log("\n\t> Login Session ready...")
+mongooseConnectPromise
+  .then(mongoose => {
+    console.log("\n\t> Login Session ready...")
 
-  /**
-   * mongoDB store for express session:
-   */
-  const store = mongoStore.create({
-    client: mongoose.connection.getClient(),
-    // cookie expiration in ms:
-    ttl: maxAge,
-    // remove sessions every min:
-    autoRemoveInterval: 1
-  })
+    // check login for auth to use user profile:
+    login.use(["/profile", "/profile/*", "/logout"], passport.authenticate("jwt", { session: false }))
 
-  // event listeners for debug:
-  store.on("set", (sessionId, session) => log("mongoStore.on('set')", "sessionId", sessionId, "session", session))
-  store.on("touch", (sessionId, session) => log("mongoStore.on('touch')", "sessionId", sessionId, "session", session))
-  store.on("create", (sessionId, session) => log("mongoStore.on('create')", "sessionId", sessionId, "session", session))
-  store.on("update", (sessionId, session) => log("mongoStore.on('update')", "sessionId", sessionId, "session", session))
-  store.on("destroy", (sessionId, session) => log("mongoStore.on('destroy')", "sessionId", sessionId, "session", session))
-
-  /** 
-   * Express server-side session middleware. 
-   */ 
-  const loginSession = session({
-    store,
-    secret: SECRET,
-    resave: false,
-    saveUninitialized: false, // if true, this website uses cookies...
-    name: "connect.sid",
-    // use for re-setting the cookie and maxAge every respone:
-    // rolling: true,
-    cookie: {
-      // client side JS should be able to access session cookie:
-      httpOnly: true,
-      // in production only use cookie with HTTPS:
-      // secure: true,
-      // TTL for the cookie on client, for sessoin expiration after time in ms, can be reset using session.touch(newMaxAge):
-      maxAge
-    }
-  })
-
-  // use express session:
-  login.use(loginSession)
-
-  // setup passport auth using sessions, pauseSteam is for async deserialization:
-  login.use(passport.session({ pauseStream: true }))
-
-  // check login for auth to use user profile:
-  login.use(["/profile", "/profile/*", "/logout"], passport.authenticate("jwt", { session: false }))
-
-  // logging middleware:
-  login.use((req, _res, next) => {
-    // prettier-ignore
-    log("login.use",
+    // logging middleware:
+    login.use((req, _res, next) => {
+      // prettier-ignore
+      log("login.use",
       "req.user", req.user,
       "req.authInfo", req.authInfo,
-      "req.sessionID", req.sessionID, 
-      "req.session", req.session,
       "req.isAuthenticated()", req.isAuthenticated?.(),
       "req.isUnauthenticated()", req.isUnauthenticated?.()
     )
-    
-    next()
-  })
 
-  // login route, send JWT token is responce and cookie:
-  login.post("/login", async (req, res) => {
-    const Log = log.stackLogger("login.post('/login')")
+      next()
+    })
 
-    Log("req.body", req.body)
+    // login route, send JWT token is responce and cookie:
+    login.post("/login", async (req, res) => {
+      const Log = log.stackLogger("login.post('/login')")
 
-    // get username and password:
-    const { username, password } = validateUserPass(req.body)
+      Log("req.body", req.body)
 
-    try {
-      // look for existing user:
-      const user = await Users.findOne({ username }).exec()
+      // get username and password:
+      const { username, password } = validateUserPass(req.body)
 
-      Log("user", user)
+      try {
+        // look for existing user:
+        const user = await Users.findOne({ username }).exec()
 
-      // return and send responce of nonexistant user, 404 Not Found:
-      if (!user) return res.status(404).json({
-        success: false,
-        nonexistant: true
-      } as SessionType)
+        Log("user", user)
 
-      // compare hashes to check password is user's password:
-      const psswdComp = await bcrypt.compare(password, user.password)
-      
-      
-      // prettier-ignore
-      Log(
+        // return and send responce of nonexistant user:
+        if (!user)
+          return res.status(HTTPStatusCode["Not Found"]).json({
+            success: false,
+            nonexistant: true
+          } as SessionType)
+
+        // compare hashes to check password is user's password:
+        const psswdComp = await bcrypt.compare(password, user.password)
+
+        // prettier-ignore
+        Log(
         "password", password,
         // "passswordHash", passwordHash,
         // const passwordHash = await bcrypt.hash(password, (user.password.match(/\$.*\$.*\$.{22}/) ?? [""])[0])
@@ -391,384 +350,388 @@ mongooseConnectPromise.then((mongoose) => {
         "psswdComp", psswdComp
       )
 
-      // return and send responce of wrong password to user, 401 Unauthorized:
-      if (!psswdComp) return res.status(401).json({
-        success: false,
-        conflict: true,
-        incorrect: ["password"]
-      } as SessionType)
+        // return and send responce of wrong password to user:
+        if (!psswdComp)
+          return res.status(HTTPStatusCode["Unauthorized"]).json({
+            success: false,
+            conflict: true,
+            incorrect: ["password"]
+          } as SessionType)
 
-      // signin JWT token:
-      const token = await jwtSign({ id: user.id })
+        // signin JWT token:
+        const token = await jwtSign({ id: user.id })
 
-      Log("token", token)
+        Log("token", token)
 
-      // set JWT in cookie:
-      setJWTCookie(res, token)
+        // set JWT in cookie:
+        setJWTCookie(res, token)
 
-      // respond with success:
-      res.json({
-        success: true,
-        user,
-        token
-      } as { user: UserType } & Omit<SessionType, "user">)
-    } catch (e){
-      Log("err", e)
-
-      // bad request:
-      res.send(400).json({ success: false } as SessionType)
-    }
-  })
-
-  // signup route, creates user in db and logs in:
-  login.post("/signup", async (req, res) => {
-    const Log = log.stackLogger("login.post('/signup')")
-
-    Log("req.body", req.body)
-
-    try {
-      // get username and password:
-      const { username, password } = validateUserPass(req.body)
-
-      // check for pre-existing user name:
-      const userTaken = await Users.findOne({ username }).exec()
-
-      Log("userTaken", userTaken)
-
-      // return and send responce of username already in use, 409 Conflict:
-      if (userTaken) return res.status(409).json({
-        success: false,
-        conflict: true,
-        preexisting: ["username"]
-      } as SessionType)
-      
-
-      // create new user:
-      const newUser = await new Users({
-        username,
-        password: await passwordHash(password)
-      }).save()
-
-      Log("newUser", newUser)
-
-      // signin JWT token:
-      const token = await jwtSign({ id: newUser.id })
-
-      Log("token", token)
-
-      // set JWT in cookie:
-      setJWTCookie(res, token)
-
-      // respond with success:
-      res.json({
-        success: true,
-        user: newUser.toObject(),
-        token
-      } as SessionType)
-    } catch (e){
-      Log("err", e)
-
-      // bad request:
-      res.send(400).json({ success: false } as SessionType)
-    }
-  })
-
-  // logout route, add JWT token to db of logged out tokens:
-  login.post("/logout", async (req, res) => {
-    const Log = log.stackLogger("login.post('/logout')")
-
-    Log("req.authInfo", req.authInfo, "maxAge", maxAge)
-
-    try {
-      // add token to db of invalid tokens:
-      const dbRes = await logoutJWT(req.authInfo?.token as string)
-
-      Log("new Logouts dbRes", dbRes)
-      
-      // token was saved to log out db:
-      if (dbRes) return res.send({ success: true } as SessionType)
-      
-      // log out db did not save token:
-      res.status(500).send({ success: false } as SessionType)
-    } catch (e){
-      Log("new Logouts error", e)
-
-      // token was not deleted:
-      res.status(500).send({ success: false } as SessionType)
-    }
-  })
-
-  // modify user owned lists:
-  login
-    .route("/profile/lists")
-    // get user owned lists:
-    .get(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile/lists').get")
-      
-      Log("req.query", req.query)
-
-      // skip certain number of newest stories:
-      const offset = Number(req.query.offset ?? 0)
-
-      // only get limited number of stories:
-      const limit = Number(req.query.limit ?? 1)
-
-      Log("offset", offset, "limit", limit)
-
-      try {
-        // get users lists:
-        const dbRes = await Lists.find({ user: req.user?.id })
-          .sort({ createdAt: -1 })
-          .skip(offset)
-          .limit(limit)
-          .exec()
-
-        Log("dbRes", dbRes)
-
-        res.json(dbRes)
-      } catch (e){
-        Log("err", e)
+        // respond with success:
+        res.json({
+          success: true,
+          user,
+          token
+        } as { user: UserType } & Omit<SessionType, "user">)
+      } catch (e) {
+        Log.error("err", e)
 
         // bad request:
-        res.sendStatus(400)
-      }
-    })
-    // save a user owned list:
-    .post(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile/lists').post")
-
-      Log("req.body", req.body, "req.user", req.user)
-
-      try {
-        /** @todo input validation */
-        // save new list:
-        const newList = await new Lists({
-          parts: req.body.parts,
-          user: req.user?.id
-        }).save()
-
-        Log("newList", newList)
-
-        // db error, Internal Server Error:
-        if (!newList) return res.sendStatus(500)
-
-        // save list id to user:
-        const user = await Users.findById(req.user?.id).exec()
-
-        Log("mongo user before", user?.toJSON())
-
-        // don't save to user if user was not found:
-        if (!user){
-          // remove user owner field from document:
-          await newList.update({ $unset: { user: "" } })
-          
-          // list was saved, but not owned by user, Not Found:
-          return res.status(404).json(newList)
-        }
-
-        // check for lists prop, and save new list:
-        if (user.lists) user.lists.push(newList.id)
-        else user.lists = [newList.id]
-
-        // save to db:
-        await user.save()
-
-        // return all info from updated user:
-        Log("mongo user after", (await user.populate("lists")).toJSON())
-
-        // return added list:
-        res.json(newList)
-      } catch (e){
-        Log("err", e)
-
-        // bad request:
-        res.sendStatus(400)
-      }
-    })
-    // delete all user owned lists:
-    .delete(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile/lists').delete")
-
-      Log("req.user", req.user)
-
-      try {
-        // delete all lists owned by user:
-        const dbRes = await Lists.deleteMany({ user: req.user?.id }).exec()
-
-        Log("dbRes", dbRes)
-
-        res.json(dbRes)
-      } catch (e){
-        Log("err", e)
-
-        // bad request:
-        res.sendStatus(400)
+        res.send(400).json({ success: false } as SessionType)
       }
     })
 
-  // modify one specific user owned list:
-  login
-    .route("/profile/lists/id/:id")
-    // edit parts in user owned list:
-    .patch(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile/lists/id/:id').patch")
+    // signup route, creates user in db and logs in:
+    login.post("/signup", async (req, res) => {
+      const Log = log.stackLogger("login.post('/signup')")
 
-      Log("req.params", req.params, "req.user", req.user)
-
-      try {
-        // only edit list owned by user:
-        const dbRes = await Lists.updateOne(
-          {
-            _id: req.params.id,
-            user: req.user?.id
-          },
-          {
-            $set: { parts: req.body.parts }
-          }
-        ).exec()
-
-        Log("dbRes", dbRes)
-
-        res.json(dbRes)
-      } catch (e){
-        Log("err", e)
-
-        // bad request:
-        res.sendStatus(400)
-      }
-    })
-    // delete one specific user owned list:
-    .delete(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile/lists/id/:id').delete")
-
-      Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
-
-      try {
-        // get user:
-        const dbUserRes = await Users.findById(req.user?.id).exec()
-
-        Log("dbUserRes before", dbUserRes)
-
-        /** @todo improve handling for missing user, when deleted in another session. */
-        // user Not Found:
-        if (!dbUserRes) return res.sendStatus(404)
-        // user owned lists Not Found:
-        if (!dbUserRes.lists) return res.sendStatus(404)
-
-        /** @todo improve handling for errors. */
-        // remove deleted list from user lists:
-        dbUserRes.lists = dbUserRes.lists.filter(listId => !listId.equals(req.params.id))
-
-        // save user with updated lists:
-        dbUserRes.save()
-        
-        Log("dbUserRes after", dbUserRes)
-
-        /** @todo improve handling for missing list. */
-        const dbListRes = await Lists.deleteOne({
-          _id: req.params.id,
-          user: req.user?.id
-        }).exec()
-
-        Log("dbListRes", dbListRes)
-
-        res.json(dbListRes)
-      } catch (e){
-        Log("err", e)
-
-        // bad request:
-        res.sendStatus(400)
-      }
-    })
-
-  // edit user profile settings:
-  login
-    .route("/profile")
-    // edit username or password:
-    .patch(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile').patch")
-
-      Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
+      Log("req.body", req.body)
 
       try {
         // get username and password:
         const { username, password } = validateUserPass(req.body)
 
-        /** @todo improve handling for errors. */
-        const dbRes = await Users.updateOne(
-          { _id: req.user?.id },
-          { $set: {
-            username: username,
-            password: await passwordHash(password)
-            }
-          }
-        ).exec()
+        // check for pre-existing user name:
+        const userTaken = await Users.findOne({ username }).exec()
 
-        Log("dbRes", dbRes)
-        
-        /** @todo improve responce codes for failed updates. */
-        res.json(dbRes)
-      } catch (e){
-        Log("err", e)
+        Log("userTaken", userTaken)
+
+        // return and send responce of username already in use:
+        if (userTaken)
+          return res.status(HTTPStatusCode["Conflict"]).json({
+            success: false,
+            conflict: true,
+            preexisting: ["username"]
+          } as SessionType)
+
+        // create new user:
+        const newUser = await new Users({
+          username,
+          password: await passwordHash(password)
+        }).save()
+
+        Log("newUser", newUser)
+
+        // signin JWT token:
+        const token = await jwtSign({ id: newUser.id })
+
+        Log("token", token)
+
+        // set JWT in cookie:
+        setJWTCookie(res, token)
+
+        // respond with success:
+        res.status(HTTPStatusCode["Created"]).json({
+          success: true,
+          user: newUser.toObject(),
+          token
+        } as SessionType)
+      } catch (e) {
+        Log.error("err", e)
 
         // bad request:
-        res.sendStatus(400)
+        res.send(400).json({ success: false } as SessionType)
       }
     })
-    // delete user and all user owned lists:
-    .delete(async (req, res) => {
-      const Log = log.stackLogger("login.route('/profile').delete")
 
-      Log("req.user", req.user, "req.body", req.body)
+    // logout route, add JWT token to db of logged out tokens:
+    login.post("/logout", async (req, res) => {
+      const Log = log.stackLogger("login.post('/logout')")
+
+      Log("req.authInfo", req.authInfo, "maxAge", maxAge)
 
       try {
-        let dbListRes: UnPromise<ReturnType<ReturnType<typeof Lists.updateMany | typeof Lists.deleteMany>["exec"]>>
-
-        // disown all user owned lists:
-        if (req.body.keepLists){
-          dbListRes = await Lists.updateMany(
-            { user: req.user?.id },
-            { $unset: { user: "" } }
-          ).exec()
-        }
-        // delete all user owned lists:
-        else dbListRes = await Lists.deleteMany({ user: req.user?.id }).exec()
-
-        Log("dbListRes", dbListRes)
-
-        /** @todo improve handling for missing user, when deleted in another session. */
-        /** @todo improve handling for errors. */
-        // delete user:
-        const dbUserRes = await Users.deleteOne({ _id: req.user?.id }).exec()
-
-        Log("dbUserRes", dbUserRes)
-
-        // return successful deletion:
-        res.json(dbUserRes)
-
-        // invalidate token by adding token to db of invalid tokens:
+        // add token to db of invalid tokens:
         const dbRes = await logoutJWT(req.authInfo?.token as string)
 
         Log("new Logouts dbRes", dbRes)
-      } catch (e){
-        Log("err", e)
 
-        // bad request:
-        res.sendStatus(400)
+        // token was saved to log out db:
+        if (dbRes) return res.send({ success: true } as SessionType)
+
+        // log out db did not save token:
+        res.status(HTTPStatusCode["Internal Server Error"]).send({ success: false } as SessionType)
+      } catch (e) {
+        Log.error("new Logouts error", e)
+
+        // token was not deleted:
+        res.status(HTTPStatusCode["Internal Server Error"]).send({ success: false } as SessionType)
       }
     })
-})
-.catch(reason => {
-  log("mongooseConnectPromise.catch", "err", `\n\tERROR!:\n${reason}`)
 
-  // no mongoDB available, cannot process logins:
-  login.use((_req, res) => {
-    log(["mongooseConnectPromise.catch", "login.use"], "err", `\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20))
+    // modify user owned lists:
+    login
+      .route("/profile/lists")
+      // get user owned lists:
+      .get(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile/lists').get")
 
-    res.sendStatus(503)
+        Log("req.query", req.query)
+
+        // skip certain number of newest stories:
+        const offset = Number(req.query.offset ?? 0)
+
+        // only get limited number of stories:
+        const limit = Number(req.query.limit ?? Infinity)
+
+        Log("offset", offset, "limit", limit)
+
+        try {
+          // get users lists:
+          const dbRes = await Lists.find({ user: req.user?.id })
+            .sort({ createdAt: -1 })
+            .skip(offset)
+            .limit(limit)
+            .exec()
+
+          Log("dbRes", dbRes)
+
+          // if there was no error, return result, which could be an empty array:
+          if (dbRes.length > 0) res.json(dbRes)
+          // if empty array, not parts were found:
+          else res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+      // save a user owned list:
+      .post(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile/lists').post")
+
+        Log("req.body", req.body, "req.user", req.user)
+
+        try {
+          /** @todo input validation */
+          // save new list:
+          const newList = await new Lists({
+            parts: req.body.parts,
+            user: req.user?.id
+          }).save()
+
+          Log("newList", newList)
+
+          // db error:
+          if (!newList) return res.sendStatus(HTTPStatusCode["Internal Server Error"])
+
+          // save list id to user:
+          const user = await Users.findById(req.user?.id).exec()
+
+          Log("mongo user before", user?.toJSON())
+
+          // don't save to user if user was not found:
+          if (!user) {
+            // remove user owner field from document:
+            await newList.update({ $unset: { user: "" } })
+
+            // list was saved, but not owned by user:
+            return res.status(HTTPStatusCode["Not Found"]).json(newList)
+          }
+
+          // check for lists prop, and save new list:
+          if (user.lists) user.lists.push(newList.id)
+          else user.lists = [newList.id]
+
+          // save to db:
+          await user.save()
+
+          // return all info from updated user:
+          Log("mongo user after", (await user.populate("lists")).toJSON())
+
+          // return added list:
+          res.status(HTTPStatusCode["Created"]).json(newList)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+      // delete all user owned lists:
+      .delete(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile/lists').delete")
+
+        Log("req.user", req.user)
+
+        try {
+          // delete all lists owned by user:
+          const dbRes = await Lists.deleteMany({ user: req.user?.id }).exec()
+
+          Log("dbRes", dbRes)
+
+          res.json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+
+    // modify one specific user owned list:
+    login
+      .route("/profile/lists/id/:id")
+      // edit parts in user owned list:
+      .patch(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile/lists/id/:id').patch")
+
+        Log("req.params", req.params, "req.user", req.user)
+
+        try {
+          // only edit list owned by user:
+          const dbRes = await Lists.updateOne(
+            {
+              _id: req.params.id,
+              user: req.user?.id
+            },
+            {
+              $set: { parts: req.body.parts }
+            }
+          ).exec()
+
+          Log("dbRes", dbRes)
+
+          res.json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+      // delete one specific user owned list:
+      .delete(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile/lists/id/:id').delete")
+
+        Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
+
+        try {
+          // get user:
+          const dbUserRes = await Users.findById(req.user?.id).exec()
+
+          Log("dbUserRes before", dbUserRes)
+
+          /** @todo improve handling for missing user, when deleted in another session. */
+          // user not found:
+          if (!dbUserRes) return res.sendStatus(HTTPStatusCode["Not Found"])
+          // user owned lists not found:
+          if (!dbUserRes.lists) return res.sendStatus(HTTPStatusCode["Not Found"])
+
+          /** @todo improve handling for errors. */
+          // remove deleted list from user lists:
+          dbUserRes.lists = dbUserRes.lists.filter(listId => !listId.equals(req.params.id))
+
+          // save user with updated lists:
+          dbUserRes.save()
+
+          Log("dbUserRes after", dbUserRes)
+
+          /** @todo improve handling for missing list. */
+          const dbListRes = await Lists.deleteOne({
+            _id: req.params.id,
+            user: req.user?.id
+          }).exec()
+
+          Log("dbListRes", dbListRes)
+
+          res.json(dbListRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+
+    // edit user profile settings:
+    login
+      .route("/profile")
+      // edit username or password:
+      .patch(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile').patch")
+
+        Log("req.body", req.body, "req.params", req.params, "req.user", req.user)
+
+        try {
+          // get username and password:
+          const { username, password } = validateUserPass(req.body)
+
+          /** @todo improve handling for errors. */
+          const dbRes = await Users.updateOne(
+            { _id: req.user?.id },
+            {
+              $set: {
+                username: username,
+                password: await passwordHash(password)
+              }
+            }
+          ).exec()
+
+          Log("dbRes", dbRes)
+
+          /** @todo improve responce codes for failed updates. */
+          res.json(dbRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
+      // delete user and all user owned lists:
+      .delete(async (req, res) => {
+        const Log = log.stackLogger("login.route('/profile').delete")
+
+        Log("req.user", req.user, "req.body", req.body)
+
+        try {
+          let dbListRes: Awaited<ReturnType<ReturnType<typeof Lists.updateMany | typeof Lists.deleteMany>["exec"]>>
+
+          // disown all user owned lists:
+          if (req.body.keepLists) {
+            dbListRes = await Lists.updateMany({ user: req.user?.id }, { $unset: { user: "" } }).exec()
+          }
+          // delete all user owned lists:
+          else dbListRes = await Lists.deleteMany({ user: req.user?.id }).exec()
+
+          Log("dbListRes", dbListRes)
+
+          /** @todo improve handling for missing user, when deleted in another session. */
+          /** @todo improve handling for errors. */
+          // delete user:
+          const dbUserRes = await Users.deleteOne({ _id: req.user?.id }).exec()
+
+          Log("dbUserRes", dbUserRes)
+
+          // return successful deletion:
+          res.json(dbUserRes)
+
+          // invalidate token by adding token to db of invalid tokens:
+          const dbRes = await logoutJWT(req.authInfo?.token as string)
+
+          Log("new Logouts dbRes", dbRes)
+        } catch (e) {
+          Log.error("err", e)
+
+          // bad request:
+          res.sendStatus(HTTPStatusCode["Bad Request"])
+        }
+      })
   })
-})
+  .catch(reason => {
+    log.error("mongooseConnectPromise.catch", "err", `\n\tERROR!:\n${reason}`)
 
-export {
-  login
-}
+    // no mongoDB available, cannot process logins:
+    login.use((_req, res) => {
+      log.error(
+        ["mongooseConnectPromise.catch", "login.use"],
+        "err",
+        `\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20)
+      )
+
+      res.sendStatus(HTTPStatusCode["Service Unavailable"])
+    })
+  })
+
+export { login }

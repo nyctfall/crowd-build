@@ -2,12 +2,14 @@ import { lazy } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
 import "vite/modulepreload-polyfill"
 import "bootstrap/dist/js/bootstrap.bundle.min.js"
-import { dbgLog } from "~types/api"
+import { dbgLog } from "~types/logger"
+import { useAppSelector } from "./redux-stuff/hooks"
 import NavBar from "./components/NavBar"
 import Footer from "./components/Footer"
 import Chunker from "./components/Chunker"
-import { useAppSelector } from "./redux-stuff/hooks"
 
+// debugging logger:
+const log = dbgLog.fileLogger("App.tsx")
 
 // dynamic imports for rollup to make automatic chunks:
 const Root = lazy(() => import("./pages/Root"))
@@ -24,7 +26,6 @@ const Database = lazy(() => import("./pages/Database"))
 const NotFound = lazy(() => import("./pages/NotFound"))
 const Benchmarks = lazy(() => import("./pages/Benchmarks"))
 
-
 // mapping of lazy loaded component/chunk to route path.
 const chunkRoutes: [React.LazyExoticComponent<() => JSX.Element>, string][] = [
   [Root, "/"],
@@ -39,75 +40,66 @@ const chunkRoutes: [React.LazyExoticComponent<() => JSX.Element>, string][] = [
   [Profile, "/profile"],
   [Database, "/database"],
   [Benchmarks, "/benchmarks"],
-  [NotFound, "*"],
+  [NotFound, "*"]
 ]
 
 /**
  * The main App, also has all of the react-router routes.
  */
-function App() {
+export default function App() {
+  // const Log = log.stackLogger("App")
+
   // login session state:
   const state = useAppSelector(state => state)
   const { session } = state
-  
-  
-  dbgLog("App.tsx", "App", "state", state)
-  
+
+  // Log("state", state)
 
   return (
     <>
       <div className="min-vh-100 d-flex flex-column align-items-stretch align-self-stretch align-content-between">
         <NavBar />
-        {/** @todo darken during loading */}
+
         <main className="flex-fill">
           <Routes>
-            {session.isLoggedIn ? <>
-                {([[Profile, "/profile"], [Profile, "/profile/*"]] as typeof chunkRoutes)
-                  .map(([Element, path], i) => 
-                    <Route 
-                      key={i} 
-                      path={path} 
-                      element={<Chunker {...{Element}} />} 
-                    />
-                  )
-                }
+            {session.isLoggedIn ? (
+              <>
+                {(
+                  [
+                    [Profile, "/profile"],
+                    [Profile, "/profile/*"]
+                  ] as typeof chunkRoutes
+                ).map(([Element, path], i) => (
+                  <Route key={i} path={path} element={<Chunker {...{ Element }} />} />
+                ))}
                 <Route path="/" element={<Navigate to="/profile" />} />
                 <Route path="/signup" element={<Navigate to="/profile" />} />
                 <Route path="/signin" element={<Navigate to="/profile" />} />
               </>
-              : <>
+            ) : (
+              <>
                 {chunkRoutes
                   .filter(([Element]) => Element === Signin || Element === Signup || Element === Root)
-                  .map(([Element, path], i) => 
-                    <Route 
-                      key={i} 
-                      path={path} 
-                      element={<Chunker {...{Element}} />} 
-                    />
-                  )
-                }
+                  .map(([Element, path], i) => (
+                    <Route key={i} path={path} element={<Chunker {...{ Element }} />} />
+                  ))}
                 <Route path="/profile" element={<Navigate to="/signin" />} />
                 <Route path="/profile/*" element={<Navigate to="/signin" />} />
               </>
-            }
-            
+            )}
+
             {chunkRoutes
-              .filter(([element]) => element !== Signin && element !== Signup && element !== Root && element !== Profile)
-              .map(([Element, path], i) => 
-                <Route 
-                  key={i} 
-                  path={path} 
-                  element={<Chunker {...{Element}} />} 
-                />
+              .filter(
+                ([element]) => element !== Signin && element !== Signup && element !== Root && element !== Profile
               )
-            }
+              .map(([Element, path], i) => (
+                <Route key={i} path={path} element={<Chunker {...{ Element }} />} />
+              ))}
           </Routes>
         </main>
-        
+
         <Footer />
       </div>
     </>
   )
 }
-
-export default App

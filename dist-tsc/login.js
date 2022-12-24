@@ -5,8 +5,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.login = void 0;
 const express_1 = __importDefault(require("express"));
-const express_session_1 = __importDefault(require("express-session"));
-const connect_mongo_1 = __importDefault(require("connect-mongo"));
 const passport_1 = __importDefault(require("passport"));
 const passport_jwt_1 = __importDefault(require("passport-jwt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -26,7 +24,7 @@ const maxAge = 1000 * 60 * 10;
 const jwtSign = (payload) => new Promise((resolve, reject) => jsonwebtoken_1.default.sign(payload, SECRET, {
     expiresIn: `${maxAge}ms`,
     subject: payload.id
-}, (err, token) => err ? reject(err) : resolve(token)));
+}, (err, token) => (err ? reject(err) : resolve(token))));
 const setJWTCookie = (res, token) => res.cookie("jwt", token, {
     expires: new Date(Date.now() + maxAge),
     httpOnly: false
@@ -43,9 +41,9 @@ const validateUserPass = (reqBody) => {
         throw Error("username not string");
     if (typeof password !== "string")
         throw Error("password not string");
-    if (username.match(/([^\u0020-\uFFFF])+/gui))
+    if (username.match(/([^\u0020-\uFFFF])+/giu))
         throw Error("username has invalid ASCII control characters");
-    if (password.match(/([^\u0020-\uFFFF])+/gui))
+    if (password.match(/([^\u0020-\uFFFF])+/giu))
         throw Error("password has invalid ASCII control characters");
     return {
         username,
@@ -63,7 +61,7 @@ const logoutJWT = (token) => {
     log("logoutJWT", "payload", payload, "expireAt", expireAt, "dbRes", dbRes);
     return dbRes;
 };
-const authHeaderExtractor = (req) => {
+const authHeaderExtractor = req => {
     const Log = log.stackLogger("authHeaderExtractor");
     Log("req.headers", req.headers, "req.headers.authorization", req.headers?.authorization);
     if (req && req.headers && req.headers.authorization) {
@@ -76,7 +74,7 @@ const authHeaderExtractor = (req) => {
     }
     return null;
 };
-const cookieExtractor = (req) => {
+const cookieExtractor = req => {
     const Log = log.stackLogger("cookieExtractor");
     Log("req.cookies", req.cookies);
     if (req && req.cookies && typeof req.cookies["jwt"] === "string") {
@@ -103,7 +101,7 @@ const JWTStratVerify = async (req, jwtPayload, done) => {
             return done(null, false);
     }
     catch (e) {
-        Log("Logouts.findOne error", e);
+        Log.error("Logouts.findOne error", e);
         done(e, false);
     }
     try {
@@ -117,12 +115,12 @@ const JWTStratVerify = async (req, jwtPayload, done) => {
             done(null, false);
         }
         catch (e) {
-            Log("new Logouts error", e);
+            Log.error("new Logouts error", e);
             done(e, false);
         }
     }
     catch (e) {
-        Log("Users.findOne error", e);
+        Log.error("Users.findOne error", e);
         done(e, false);
     }
 };
@@ -145,38 +143,16 @@ passport_1.default.deserializeUser(async (id, done) => {
         done(null, false);
     }
     catch (e) {
-        Log("Users.findById error", e);
+        Log.error("Users.findById error", e);
         done(e, false);
     }
 });
-database_1.mongooseConnectPromise.then((mongoose) => {
+database_1.mongooseConnectPromise
+    .then(mongoose => {
     console.log("\n\t> Login Session ready...");
-    const store = connect_mongo_1.default.create({
-        client: mongoose.connection.getClient(),
-        ttl: maxAge,
-        autoRemoveInterval: 1
-    });
-    store.on("set", (sessionId, session) => log("mongoStore.on('set')", "sessionId", sessionId, "session", session));
-    store.on("touch", (sessionId, session) => log("mongoStore.on('touch')", "sessionId", sessionId, "session", session));
-    store.on("create", (sessionId, session) => log("mongoStore.on('create')", "sessionId", sessionId, "session", session));
-    store.on("update", (sessionId, session) => log("mongoStore.on('update')", "sessionId", sessionId, "session", session));
-    store.on("destroy", (sessionId, session) => log("mongoStore.on('destroy')", "sessionId", sessionId, "session", session));
-    const loginSession = (0, express_session_1.default)({
-        store,
-        secret: SECRET,
-        resave: false,
-        saveUninitialized: false,
-        name: "connect.sid",
-        cookie: {
-            httpOnly: true,
-            maxAge
-        }
-    });
-    login.use(loginSession);
-    login.use(passport_1.default.session({ pauseStream: true }));
     login.use(["/profile", "/profile/*", "/logout"], passport_1.default.authenticate("jwt", { session: false }));
     login.use((req, _res, next) => {
-        log("login.use", "req.user", req.user, "req.authInfo", req.authInfo, "req.sessionID", req.sessionID, "req.session", req.session, "req.isAuthenticated()", req.isAuthenticated?.(), "req.isUnauthenticated()", req.isUnauthenticated?.());
+        log("login.use", "req.user", req.user, "req.authInfo", req.authInfo, "req.isAuthenticated()", req.isAuthenticated?.(), "req.isUnauthenticated()", req.isUnauthenticated?.());
         next();
     });
     login.post("/login", async (req, res) => {
@@ -187,14 +163,14 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             const user = await user_1.default.findOne({ username }).exec();
             Log("user", user);
             if (!user)
-                return res.status(404).json({
+                return res.status(api_1.HTTPStatusCode["Not Found"]).json({
                     success: false,
                     nonexistant: true
                 });
             const psswdComp = await bcrypt_1.default.compare(password, user.password);
             Log("password", password, "user.password", user.password, "psswdComp", psswdComp);
             if (!psswdComp)
-                return res.status(401).json({
+                return res.status(api_1.HTTPStatusCode["Unauthorized"]).json({
                     success: false,
                     conflict: true,
                     incorrect: ["password"]
@@ -209,7 +185,7 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             });
         }
         catch (e) {
-            Log("err", e);
+            Log.error("err", e);
             res.send(400).json({ success: false });
         }
     });
@@ -221,7 +197,7 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             const userTaken = await user_1.default.findOne({ username }).exec();
             Log("userTaken", userTaken);
             if (userTaken)
-                return res.status(409).json({
+                return res.status(api_1.HTTPStatusCode["Conflict"]).json({
                     success: false,
                     conflict: true,
                     preexisting: ["username"]
@@ -234,14 +210,14 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             const token = await jwtSign({ id: newUser.id });
             Log("token", token);
             setJWTCookie(res, token);
-            res.json({
+            res.status(api_1.HTTPStatusCode["Created"]).json({
                 success: true,
                 user: newUser.toObject(),
                 token
             });
         }
         catch (e) {
-            Log("err", e);
+            Log.error("err", e);
             res.send(400).json({ success: false });
         }
     });
@@ -253,11 +229,11 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             Log("new Logouts dbRes", dbRes);
             if (dbRes)
                 return res.send({ success: true });
-            res.status(500).send({ success: false });
+            res.status(api_1.HTTPStatusCode["Internal Server Error"]).send({ success: false });
         }
         catch (e) {
-            Log("new Logouts error", e);
-            res.status(500).send({ success: false });
+            Log.error("new Logouts error", e);
+            res.status(api_1.HTTPStatusCode["Internal Server Error"]).send({ success: false });
         }
     });
     login
@@ -266,7 +242,7 @@ database_1.mongooseConnectPromise.then((mongoose) => {
         const Log = log.stackLogger("login.route('/profile/lists').get");
         Log("req.query", req.query);
         const offset = Number(req.query.offset ?? 0);
-        const limit = Number(req.query.limit ?? 1);
+        const limit = Number(req.query.limit ?? Infinity);
         Log("offset", offset, "limit", limit);
         try {
             const dbRes = await list_1.default.find({ user: req.user?.id })
@@ -275,11 +251,14 @@ database_1.mongooseConnectPromise.then((mongoose) => {
                 .limit(limit)
                 .exec();
             Log("dbRes", dbRes);
-            res.json(dbRes);
+            if (dbRes.length > 0)
+                res.json(dbRes);
+            else
+                res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     })
         .post(async (req, res) => {
@@ -292,12 +271,12 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             }).save();
             Log("newList", newList);
             if (!newList)
-                return res.sendStatus(500);
+                return res.sendStatus(api_1.HTTPStatusCode["Internal Server Error"]);
             const user = await user_1.default.findById(req.user?.id).exec();
             Log("mongo user before", user?.toJSON());
             if (!user) {
                 await newList.update({ $unset: { user: "" } });
-                return res.status(404).json(newList);
+                return res.status(api_1.HTTPStatusCode["Not Found"]).json(newList);
             }
             if (user.lists)
                 user.lists.push(newList.id);
@@ -305,11 +284,11 @@ database_1.mongooseConnectPromise.then((mongoose) => {
                 user.lists = [newList.id];
             await user.save();
             Log("mongo user after", (await user.populate("lists")).toJSON());
-            res.json(newList);
+            res.status(api_1.HTTPStatusCode["Created"]).json(newList);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     })
         .delete(async (req, res) => {
@@ -321,8 +300,8 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             res.json(dbRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     });
     login
@@ -341,8 +320,8 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             res.json(dbRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     })
         .delete(async (req, res) => {
@@ -352,9 +331,9 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             const dbUserRes = await user_1.default.findById(req.user?.id).exec();
             Log("dbUserRes before", dbUserRes);
             if (!dbUserRes)
-                return res.sendStatus(404);
+                return res.sendStatus(api_1.HTTPStatusCode["Not Found"]);
             if (!dbUserRes.lists)
-                return res.sendStatus(404);
+                return res.sendStatus(api_1.HTTPStatusCode["Not Found"]);
             dbUserRes.lists = dbUserRes.lists.filter(listId => !listId.equals(req.params.id));
             dbUserRes.save();
             Log("dbUserRes after", dbUserRes);
@@ -366,8 +345,8 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             res.json(dbListRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     });
     login
@@ -377,7 +356,8 @@ database_1.mongooseConnectPromise.then((mongoose) => {
         Log("req.body", req.body, "req.params", req.params, "req.user", req.user);
         try {
             const { username, password } = validateUserPass(req.body);
-            const dbRes = await user_1.default.updateOne({ _id: req.user?.id }, { $set: {
+            const dbRes = await user_1.default.updateOne({ _id: req.user?.id }, {
+                $set: {
                     username: username,
                     password: await passwordHash(password)
                 }
@@ -386,8 +366,8 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             res.json(dbRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     })
         .delete(async (req, res) => {
@@ -408,16 +388,16 @@ database_1.mongooseConnectPromise.then((mongoose) => {
             Log("new Logouts dbRes", dbRes);
         }
         catch (e) {
-            Log("err", e);
-            res.sendStatus(400);
+            Log.error("err", e);
+            res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
         }
     });
 })
     .catch(reason => {
-    log("mongooseConnectPromise.catch", "err", `\n\tERROR!:\n${reason}`);
+    log.error("mongooseConnectPromise.catch", "err", `\n\tERROR!:\n${reason}`);
     login.use((_req, res) => {
-        log(["mongooseConnectPromise.catch", "login.use"], "err", `\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20));
-        res.sendStatus(503);
+        log.error(["mongooseConnectPromise.catch", "login.use"], "err", `\n\tERROR! No MongoDB available.\nError:\n${reason}`.repeat(20));
+        res.sendStatus(api_1.HTTPStatusCode["Service Unavailable"]);
     });
 });
 //# sourceMappingURL=login.js.map

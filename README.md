@@ -52,6 +52,32 @@ npm install
 npm install --workspaces
 ```
 
+Just use the Docker container with `docker compose up` and MongoDB env settings should already be set in the `docker-compose.dev.yml`.
+
+
+Or 
+
+Setup a mongoDB testing server, then put the URL of the MongoDB server in a `.env` file in the project root directory.
+
+```bash
+# in project directory
+echo '# local env variables:
+MONGODB="YOUR_LOCAL_MONGODB_SERVER_URL" # your local testing MongoDB URL, probably like "mongodb://127.0.0.1:27017"' >> .env
+```
+
+And then add the SECRET for JWT token signing.
+
+```bash
+echo 'SECRET="secret" # just "secret" for current testing to keep JWTs consistant' >> .env
+```
+
+You should be able to start by setting up the database and server with:
+
+```bash
+npm run init-db # NOTE: this with initialise and modify the testing database
+npm run dev
+```
+
 ## The Website
 
 The site is a SPA app that uses React Router. It has user accounts and the functionality to save lists publicly editable or just modifiable by the user that created it. It has a search feature to find PC parts and PC part lists. 

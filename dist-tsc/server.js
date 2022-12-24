@@ -63,7 +63,7 @@ app.get("/*", (req, res) => {
 });
 app.use(((err, _req, res, _next) => {
     log("Error Handling Middleware", "error.name", err.name, "error.message", err.message, "error.cause", err.cause, "error.stack", err.stack);
-    res.sendStatus(500);
+    res.sendStatus(api_1.HTTPStatusCode["Internal Server Error"]);
 }));
 const server = app.listen(PORT, () => {
     console.log(`\n\tApp running in port ${PORT}`, `\n\n\tNODE_ENV MODE: "${process.env.NODE_ENV === "production" ? "production" : "developement"}"`, `\n\n\t> Local: http://localhost:${PORT}/`);

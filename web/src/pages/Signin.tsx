@@ -2,9 +2,8 @@ import { Button, Container } from "react-bootstrap"
 import { LinkContainer } from "react-router-bootstrap"
 import Login from "../components/Login"
 
-
 /**
- * 
+ * Sign in to user account page.
  */
 export default function Signin() {
   return (
@@ -15,7 +14,6 @@ export default function Signin() {
 
       <Container>
         Don't have an account? <br />
-        
         <LinkContainer to="/signup" className="m-5">
           <Button variant="secondary">Sign up!</Button>
         </LinkContainer>

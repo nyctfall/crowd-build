@@ -1,10 +1,8 @@
 /**
- * 
+ * @todo
  */
-export default function Benchmarks(){
+export default function Benchmarks() {
   return (
-    <>
-      <h1>Benchmarks</h1>
-    </>
+    <h1>Benchmarks</h1>
   )
 }

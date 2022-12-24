@@ -79,7 +79,7 @@ const NewsSchema = new mongoose_1.Schema({
         },
         byUpdatedAfter(minDate) {
             return this.find({ updatedAt: { $gte: new Date(minDate) } });
-        },
+        }
     }
 });
 const News = mongoose_1.default.model("News", NewsSchema);

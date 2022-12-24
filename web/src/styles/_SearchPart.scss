@@ -1,15 +1,14 @@
 // import all of Bootstrap's CSS
 @use "~bootstrap/scss/bootstrap.scss" as *;
 
-
-@include media-breakpoint-down(md){
+@include media-breakpoint-down(md) {
   // use small dropdown menu for small and thin screens
   #search-type-toolbar {
     display: none;
   }
 }
 
-@include media-breakpoint-up(md){
+@include media-breakpoint-up(md) {
   // use large toolbar for large and wide screens
   #search-type-select {
     display: none;
@@ -19,4 +18,3 @@
 #search-bar {
   max-width: map-get($container-max-widths, xxl);
 }
-

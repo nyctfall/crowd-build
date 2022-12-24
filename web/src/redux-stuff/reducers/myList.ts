@@ -1,39 +1,34 @@
-import { createEntityAdapter, createSlice } from "@reduxjs/toolkit"
-import type { PCPartInfo } from "~types/api"
+import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 
+/**
+ * The default Redux Adapter store PC part list ID used for myList.
+ */
+export const myListStoreAdapterDefaultID: string = ""
 
-const myListAdapter = createEntityAdapter<PCPartInfo>({
-  selectId: part => part._id
-})
+const initialState = {
+  id: myListStoreAdapterDefaultID
+}
 
 export const myListSlice = createSlice({
   name: "myList",
-  initialState: myListAdapter.getInitialState(),
+  initialState: initialState,
   reducers: {
-    addMyListPart: myListAdapter.addOne,
-    addManyMyListParts: myListAdapter.addMany,
-    removeMyListPart: myListAdapter.removeOne,
-    removeManyMyListParts: myListAdapter.removeMany,
-    removeAllMyListParts: myListAdapter.removeAll,
-    setMyListPart: myListAdapter.setOne,
-    setManyMyListParts: myListAdapter.setMany,
-    setAllMyListParts: myListAdapter.setAll,
-    updateMyListPart: myListAdapter.updateOne,
-    updateManyMyListParts: myListAdapter.updateMany,
-    upsertMyListPart: myListAdapter.upsertOne,
-    upsertManyMyListParts: myListAdapter.upsertMany
-  },
+    /**
+     * Set the list cache ID for myList to the list ID to be used as myList.
+     */
+    setMyListId(state, { payload }: PayloadAction<string>) {
+      state.id = payload
+    },
+    /**
+     * Resets the list cache ID for myList back to the default of: "0".
+     */
+    resetMyListId(state) {
+      state.id = myListStoreAdapterDefaultID
+    }
+  }
 })
 
 // Action creators are generated for each case reducer function
-export const { 
-  addMyListPart, addManyMyListParts, 
-  removeMyListPart, removeManyMyListParts, removeAllMyListParts, 
-  setMyListPart, setManyMyListParts, setAllMyListParts, 
-  updateMyListPart, updateManyMyListParts, 
-  upsertMyListPart, upsertManyMyListParts 
-} = myListSlice.actions
-
-export { myListAdapter }
+export const { setMyListId, resetMyListId } = myListSlice.actions
 
 export default myListSlice.reducer

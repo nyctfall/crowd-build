@@ -22,8 +22,5 @@
   },
   "include": ["./**/*", "../types/**/*"],
   "exclude": [],
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "../types/" }
-  ]
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "../types/" }]
 }

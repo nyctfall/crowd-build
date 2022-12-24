@@ -1,25 +1,23 @@
-import { useEffect, useState } from "react"
-import { skipToken } from "@reduxjs/toolkit/dist/query"
+import { useState } from "react"
 import { Button, Col, Form, Row, Spinner } from "react-bootstrap"
+import { dbgLog } from "~types/logger"
+import { HTTPStatusCode } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
-import { usePostLoginQuery } from "../redux-stuff/query"
-import { sessionLogin, sessionSetToken } from "../redux-stuff/reducers/session"
-import { dbgLog } from "~types/api"
+import { useLazyPostLoginQuery } from "../redux-stuff/query"
+import { sessionLogin } from "../redux-stuff/reducers/session"
 
+// debugging logger:
+const log = dbgLog.fileLogger("Login.tsx")
 
-/** 
+/**
  * Login using JWT header session.
  */
-export default function Login({ createUser }: { createUser?: boolean }){
+export default function Login({ createUser, onSubmit }: { createUser?: boolean; onSubmit?: Function }) {
+  const Log = log.stackLogger("Login")
+
   const dispatch = useAppDispatch()
 
   const session = useAppSelector(state => state.session)
-
-
-  // input typing state:
-  const [typed, setTyped] = useState(false)
-  const [typedPsswd, setTypedPsswd] = useState(false)
-  const [typedUsername, setTypedUsername] = useState(false)
 
   // username and password to send to server:
   const [usernamePost, setUsername] = useState("")
@@ -29,133 +27,143 @@ export default function Login({ createUser }: { createUser?: boolean }){
   const [usernameInput, setUsernameInput] = useState("")
   const [psswdInput, setPsswdInput] = useState("")
 
+  // input typing state for help message:
+  const typedUsername = usernameInput !== usernamePost
+  const typedPsswd = psswdInput !== psswdPost
+  const typed = typedUsername || typedPsswd
 
   // send credentials to server to auth:
-  const loginQuery = usePostLoginQuery(usernamePost && psswdPost ? { username: usernamePost, password: psswdPost, createUser } : skipToken)
+  const [trigger, loginQuery] = useLazyPostLoginQuery()
+  const { isSuccess, isUninitialized, isFetching, isError, error } = loginQuery
 
-  const { data, isSuccess, isUninitialized, isFetching } = loginQuery
-  
-  
-  // set creds in store cache for auth:
-  useEffect(() => {
-    dbgLog("Login.tsx", ["Login","useEffect(,[data])"], "loginQuery", loginQuery, "session", session)
-    
-    if (data && data.success && data.user && data.token){
-      dispatch(sessionLogin(data.user))
-      dispatch(sessionSetToken(data.token))
-    }
-  }, [data])
-  
-  
-  // track help message state:
-  useEffect(() => {
-    dbgLog("Login.tsx", ["Login","useEffect(,[usernameInput, psswdInput, usernamePost, psswdPost])"], "typed", typed, "typedPsswd", typedPsswd, "typedUsername", typedUsername, "usernameInput", usernameInput, "psswdInput", psswdInput, "usernamePost", usernamePost, "psswdPost", psswdPost)
-    
-    // no difference in typed input field and creds being sent:
-    if (usernameInput === usernamePost && psswdInput === psswdPost) setTyped(false)
-    // typed input field and new creds have not been sent:
-    else setTyped(true)
-    
-    // no difference in typed input field and creds being sent:
-    if (usernameInput === usernamePost) setTypedUsername(false)
-    // typed input field and new creds have not been sent:
-    else setTypedUsername(true)
-    
-    // no difference in typed input field and creds being sent:
-    if (psswdInput === psswdPost) setTypedPsswd(false)
-    // typed input field and new creds have not been sent:
-    else setTypedPsswd(true)
-  }, [usernameInput, psswdInput, usernamePost, psswdPost])
+  // const RTKErrorData = error && "data" in error ? (error.data as typeof data) : undefined
 
+  const RTKErrorHTTPStatusCode =
+    error && "status" in error && typeof error.status === "number" ? error.status : undefined
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    dbgLog("Login.tsx", "Login() > handleSubmit()", "usernameInput", usernameInput, "psswdInput", psswdInput, "usernamePost", usernamePost, "psswdPost", psswdPost)
-    
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const log = Log.stackLoggerInc("handleSubmit()")
+
+    // prettier-ignore
+    log(
+      "usernameInput", usernameInput,
+      "psswdInput", psswdInput,
+      "usernamePost", usernamePost,
+      "psswdPost", psswdPost,
+      "error", error
+    )
+
     e.preventDefault()
-    
+
     // set creds to current input field values:
     setPsswd(psswdInput)
     setUsername(usernameInput)
-  }
-  
 
-  const usernameIsValid = !typedUsername && data && data.incorrect && !(createUser ? data.nonexistant : data.preexisting)
-  const usernameIsInvalid = !isFetching && !typed && Boolean(data && (data.preexisting || data.nonexistant))
-  const psswdIsInvalid = !isFetching && data && !typed ? Boolean(data.incorrect) : undefined
-  
-  dbgLog("Login.tsx", "Login", "usernameIsValid", usernameIsValid, "usernameIsInvalid", usernameIsInvalid, "psswdIsInvalid", psswdIsInvalid, "usernameInput", usernameInput, "psswdInput", psswdInput, "usernamePost", usernamePost, "psswdPost", psswdPost, "loginQuery", loginQuery, "session", session)
-  
+    // send request:
+    if (usernamePost && psswdPost) {
+      const queryRes = trigger({
+        username: usernameInput,
+        password: psswdInput,
+        createUser
+      })
+
+      log("queryRes", queryRes)
+      ;(async () => {
+        try {
+          const data = await queryRes.unwrap()
+
+          log("data", data)
+
+          // set creds in store cache for auth:
+          dispatch(
+            sessionLogin({
+              user: data.user,
+              token: data.token
+            })
+          )
+        } catch (error) {
+          log.error("query error", error)
+        }
+      })()
+    }
+
+    // call parent handler:
+    onSubmit?.(e)
+  }
+
+  const usernameIsValid = isSuccess || !typedUsername || RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"]
+  const usernameIsInvalid = isError && !typed && RTKErrorHTTPStatusCode === HTTPStatusCode["Not Found"]
+  const psswdIsInvalid = isError && !typed ? RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"] : undefined
 
   return (
-    <>
-      <Form 
-        className="text-start w-75 mx-auto pt-5" 
-        style={{maxWidth: "500px"}}
-        onSubmit={handleSubmit} 
-        validated={data ? data.success : undefined}
-      >
-        <Form.Group as={Row} className="mb-3">
-          <Form.Label column sm={2}>Username</Form.Label>
-          
-          <Col>
-            <Form.Control 
-              required  
-              type="text" 
-              placeholder="Username" 
-              onChange={e => setUsernameInput(e.target.value)} 
-              isValid={usernameIsValid} 
-              isInvalid={usernameIsInvalid}
-            />
-            
+    <Form
+      className="text-start w-75 mx-auto pt-5"
+      style={{ maxWidth: "500px" }}
+      onSubmit={handleSubmit}
+      validated={!isUninitialized ? isSuccess : undefined}
+    >
+      <Form.Group as={Row} className="mb-3">
+        <Form.Label column sm={2}>
+          Username
+        </Form.Label>
+
+        <Col>
+          <Form.Control
+            required
+            type="text"
+            placeholder="Username"
+            onChange={e => setUsernameInput(e.target.value)}
+            isValid={usernameIsValid}
+            isInvalid={usernameIsInvalid}
+          />
+
+          {usernamePost ? (
             <Form.Control.Feedback type="valid" placeholder="Username">
-              {usernamePost ? `Hi ${usernamePost}!` : ""}
+              Hi {usernamePost}!
             </Form.Control.Feedback>
+          ) : undefined}
 
-            <Form.Control.Feedback type="invalid" placeholder="Username">
-              {data ?
-                createUser && data.preexisting?.includes("username") ?
-                  "Choose a different username."
-                  : !createUser && data.nonexistant ?
-                    "User does not exist."
-                    : "Error"
-                : "Username"
-              }
-            </Form.Control.Feedback>
-          </Col>
-        </Form.Group>
+          <Form.Control.Feedback type="invalid" placeholder="Username">
+            {RTKErrorHTTPStatusCode === HTTPStatusCode["Conflict"]
+              ? "Choose a different username."
+              : RTKErrorHTTPStatusCode === HTTPStatusCode["Not Found"]
+              ? "User does not exist."
+              : "Username"}
+          </Form.Control.Feedback>
+        </Col>
+      </Form.Group>
 
-        <Form.Group as={Row} className="mb-3">
-          <Form.Label column sm={2}>Password</Form.Label>
-          
-          <Col>
-            <Form.Control 
-              required 
-              type="password" 
-              placeholder="Password" 
-              onChange={e => setPsswdInput(e.target.value)} 
-              isInvalid={psswdIsInvalid}
-            />
+      <Form.Group as={Row} className="mb-3">
+        <Form.Label column sm={2}>
+          Password
+        </Form.Label>
 
-            <Form.Control.Feedback type="invalid" placeholder="Password">
-              {data ?
-                !createUser && data.incorrect?.includes("password") ?
-                  "Incorrect password."
-                  : "Error"
-                : "Password"
-              }
-            </Form.Control.Feedback>
-          </Col>
-        </Form.Group>
-        
-        <Row>
-          <Button variant={isFetching ? "outline-primary" : ((!isSuccess && !isUninitialized) || (data && !data.success)) && !typed ? "danger" : "primary"} type="submit" className="col-sm-2 ms-auto me-3">
-            {isFetching ? 
-                <Spinner animation="border"/>
-              : "Send"
-            }
-          </Button>
-        </Row>
-      </Form>
-    </>
+        <Col>
+          <Form.Control
+            required
+            type="password"
+            placeholder="Password"
+            onChange={e => setPsswdInput(e.target.value)}
+            isInvalid={psswdIsInvalid}
+          />
+
+          <Form.Control.Feedback type="invalid" placeholder="Password">
+            {RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"] ? "Incorrect password." : "Password"}
+          </Form.Control.Feedback>
+        </Col>
+      </Form.Group>
+
+      <Row>
+        {/** @todo convert to stateful button */}
+        <Button
+          variant={isFetching ? "outline-primary" : isError && !typed ? "danger" : "primary"}
+          active={isFetching}
+          type="submit"
+          className="col-sm-2 ms-auto me-3"
+        >
+          {isFetching ? <Spinner animation="border" /> : "Send"}
+        </Button>
+      </Row>
+    </Form>
   )
 }

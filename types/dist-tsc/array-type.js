@@ -5,7 +5,11 @@ class ArrayWithTypes {
     #array = [];
     #type;
     #isTypeCoercible = (arg) => {
-        if ((typeof this.#type === "string" && typeof arg === this.#type) || (this.#type && typeof this.#type === "object" && (typeof this.#type[Symbol.hasInstance] === "function" || typeof this.#type === "function") && arg instanceof this.#type))
+        if ((typeof this.#type === "string" && typeof arg === this.#type) ||
+            (this.#type &&
+                typeof this.#type === "object" &&
+                (typeof this.#type[Symbol.hasInstance] === "function" || typeof this.#type === "function") &&
+                arg instanceof this.#type))
             return true;
         return false;
     };
@@ -20,9 +24,7 @@ class ArrayWithTypes {
         if (typeof isTypeCoercible === "function")
             this.#isTypeCoercible = isTypeCoercible;
         if (Array.isArray(initArray)) {
-            this.#array = initArray
-                .filter(v => this.#isTypeCoercible(v))
-                .map(coercibleV => this.#typeCoerce(coercibleV));
+            this.#array = initArray.filter(v => this.#isTypeCoercible(v)).map(coercibleV => this.#typeCoerce(coercibleV));
             if (seal)
                 Object.seal(this.#array);
             if (freeze)
@@ -47,7 +49,7 @@ class ArrayWithTypes {
     set(index, value) {
         const valueT = this.#typeCoerce(value);
         if (valueT)
-            return this.#array[index] = valueT;
+            return (this.#array[index] = valueT);
         return undefined;
     }
     getArray() {
@@ -62,17 +64,13 @@ class ArrayWithTypes {
             return this.#array.fill(valueT, start, end);
     }
     splice(start, deleteCount, ...items) {
-        const itemsT = items
-            .filter(v => this.#isTypeCoercible(v))
-            .map(coercibleV => this.#typeCoerce(coercibleV));
+        const itemsT = items.filter(v => this.#isTypeCoercible(v)).map(coercibleV => this.#typeCoerce(coercibleV));
         if (itemsT.length > 0 && deleteCount)
             return this.#array.splice(start, deleteCount, ...itemsT);
         return this.#array.splice(start, deleteCount);
     }
     push(...items) {
-        const itemsT = items
-            .filter(v => this.#isTypeCoercible(v))
-            .map(coercibleV => this.#typeCoerce(coercibleV));
+        const itemsT = items.filter(v => this.#isTypeCoercible(v)).map(coercibleV => this.#typeCoerce(coercibleV));
         if (itemsT.length > 0)
             return this.#array.push(...itemsT);
     }
@@ -112,7 +110,11 @@ class ArrayTypeSafeMethods extends Array {
     }
     #type;
     #verifier = (arg) => {
-        if ((typeof this.#type === "string" && typeof arg === this.#type) || (this.#type && typeof this.#type === "object" && (typeof this.#type[Symbol.hasInstance] === "function" || typeof this.#type === "function") && arg instanceof this.#type))
+        if ((typeof this.#type === "string" && typeof arg === this.#type) ||
+            (this.#type &&
+                typeof this.#type === "object" &&
+                (typeof this.#type[Symbol.hasInstance] === "function" || typeof this.#type === "function") &&
+                arg instanceof this.#type))
             return true;
         return false;
     };
@@ -128,9 +130,7 @@ class ArrayTypeSafeMethods extends Array {
         if (typeof verifier === "function")
             this.#verifier = verifier;
         if (Array.isArray(initArray)) {
-            this.push(...initArray
-                .filter(v => this.#verifier(v))
-                .map(coercibleV => this.#coercer(coercibleV)));
+            this.push(...initArray.filter(v => this.#verifier(v)).map(coercibleV => this.#coercer(coercibleV)));
             if (seal)
                 Object.seal(this);
             if (freeze)
@@ -159,17 +159,13 @@ class ArrayTypeSafeMethods extends Array {
         return this;
     }
     splice(start, deleteCount, ...items) {
-        const itemsT = items
-            .filter(v => this.#verifier(v))
-            .map(coercibleV => this.#coercer(coercibleV));
+        const itemsT = items.filter(v => this.#verifier(v)).map(coercibleV => this.#coercer(coercibleV));
         if (itemsT.length > 0 && deleteCount)
             return super.splice(start, deleteCount, ...itemsT);
         return super.splice(start, deleteCount);
     }
     push(...items) {
-        const itemsT = items
-            .filter(v => this.#verifier(v))
-            .map(coercibleV => this.#coercer(coercibleV));
+        const itemsT = items.filter(v => this.#verifier(v)).map(coercibleV => this.#coercer(coercibleV));
         if (itemsT.length > 0)
             return super.push(...itemsT);
         return NaN;

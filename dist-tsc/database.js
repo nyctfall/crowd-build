@@ -21,10 +21,10 @@ let mongooseConnect;
 exports.mongooseConnect = mongooseConnect;
 (async () => {
     if (!MONGODB) {
-        log("MONGODB == false", "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(10));
+        log.error("MONGODB == false", "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(10));
         return dbHandler.use((_req, res) => {
-            log(["MONGODB == false", "dbHandler.use"], "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(20));
-            res.sendStatus(503);
+            log.error(["MONGODB == false", "dbHandler.use"], "err", "\n\tERROR! Error: No MongoDB database!!!!".repeat(20));
+            res.sendStatus(api_1.HTTPStatusCode["Service Unavailable"]);
         });
     }
     try {
@@ -47,7 +47,7 @@ exports.mongooseConnect = mongooseConnect;
             const releasedBefore = req.query.releasedBefore;
             const typeInfo = req.query.typeInfo;
             const offset = Number(req.query.offset ?? 0);
-            const limit = Number(req.query.limit ?? 1);
+            const limit = Number(req.query.limit ?? Infinity);
             Log("id", id, "name", name, "type", type, "oem", oem, "model", model, "minPrice", minPrice, "maxPrice", maxPrice, "releasedAfter", releasedAfter, "releasedBefore", releasedBefore, "typeInfo", typeInfo, "offset", offset, "limit", limit);
             try {
                 const dbQuery = part_1.default.find();
@@ -74,11 +74,14 @@ exports.mongooseConnect = mongooseConnect;
                 Log("dbQuery", dbQuery);
                 const dbRes = await dbQuery.exec();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                if (dbRes.length > 0)
+                    res.json(dbRes);
+                else
+                    res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler
@@ -92,11 +95,11 @@ exports.mongooseConnect = mongooseConnect;
                 if (dbRes)
                     res.json(dbRes);
                 else
-                    res.sendStatus(404);
+                    res.sendStatus(api_1.HTTPStatusCode["Not Found"]);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler
@@ -105,21 +108,19 @@ exports.mongooseConnect = mongooseConnect;
             const Log = log.stackLogger("dbHandler.route('/lists').get");
             Log("req.query", req.query);
             const offset = Number(req.query.offset ?? 0);
-            const limit = Number(req.query.limit ?? 1);
+            const limit = Number(req.query.limit ?? Infinity);
             Log("offset", offset, "limit", limit);
             try {
-                const dbRes = await list_1.default
-                    .find()
-                    .sort({ createdAt: -1 })
-                    .skip(offset)
-                    .limit(limit)
-                    .exec();
+                const dbRes = await list_1.default.find().sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                if (dbRes.length > 0)
+                    res.json(dbRes);
+                else
+                    res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         })
             .post(async (req, res) => {
@@ -128,11 +129,11 @@ exports.mongooseConnect = mongooseConnect;
             try {
                 const dbRes = await new list_1.default({ parts: req.body.parts }).save();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                res.status(api_1.HTTPStatusCode["Created"]).json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler
@@ -146,11 +147,11 @@ exports.mongooseConnect = mongooseConnect;
                 if (dbRes)
                     res.json(dbRes);
                 else
-                    res.sendStatus(404);
+                    res.sendStatus(api_1.HTTPStatusCode["Not Found"]);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         })
             .patch(async (req, res) => {
@@ -165,8 +166,8 @@ exports.mongooseConnect = mongooseConnect;
                 res.json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         })
             .delete(async (req, res) => {
@@ -181,48 +182,49 @@ exports.mongooseConnect = mongooseConnect;
                 res.json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler.get("/users/id/:id", async (req, res) => {
             const Log = log.stackLogger("dbHandler.route('/users/id/:id').get");
             Log("req.params", req.params);
             try {
-                const dbRes = await user_1.default
-                    .findById(req.params.id)
-                    .select("-password")
-                    .exec();
+                const dbRes = await user_1.default.findById(req.params.id).select("-password").exec();
                 Log("dbRes", dbRes);
                 if (dbRes)
                     res.json(dbRes);
                 else
-                    res.sendStatus(404);
+                    res.sendStatus(api_1.HTTPStatusCode["Not Found"]);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler.get("/users", async (req, res) => {
             const Log = log.stackLogger("dbHandler.route('/users').get");
             Log("req.query", req.query);
             const offset = Number(req.query.offset ?? 0);
-            const limit = Number(req.query.limit ?? 1);
+            const limit = Number(req.query.limit ?? Infinity);
             Log("offset", offset, "limit", limit);
             try {
-                const dbRes = await user_1.default.find()
+                const dbRes = await user_1.default
+                    .find()
                     .select("-password")
                     .sort({ createdAt: -1 })
                     .skip(offset)
                     .limit(limit)
                     .exec();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                if (dbRes.length > 0)
+                    res.json(dbRes);
+                else
+                    res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
         dbHandler.get("/news", async (req, res) => {
@@ -232,29 +234,24 @@ exports.mongooseConnect = mongooseConnect;
             const limit = Number(req.query.limit ?? 1);
             Log("offset", offset, "limit", limit);
             try {
-                const dbRes = await news_1.default
-                    .find({})
-                    .sort({ createdAt: -1 })
-                    .skip(offset)
-                    .limit(limit)
-                    .exec();
+                const dbRes = await news_1.default.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
                 Log("dbRes", dbRes);
-                if (dbRes)
+                if (dbRes.length > 0)
                     res.json(dbRes);
                 else
-                    res.sendStatus(404);
+                    res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
             }
             catch (e) {
-                Log("err", e);
-                res.sendStatus(400);
+                Log.error("err", e);
+                res.sendStatus(api_1.HTTPStatusCode["Bad Request"]);
             }
         });
     }
     catch (e) {
-        log("catch await mongoose.connect", "err", e);
+        log.error("catch await mongoose.connect", "err", e);
         dbHandler.use((_req, res) => {
-            log(["catch await mongoose.connect", "dbHandler.use"], "err", "\n\tError connecting to MongoDB database!!!!".repeat(10));
-            res.sendStatus(503);
+            log.error(["catch await mongoose.connect", "dbHandler.use"], "err", "\n\tError connecting to MongoDB database!!!!".repeat(10));
+            res.sendStatus(api_1.HTTPStatusCode["Service Unavailable"]);
         });
     }
 })();

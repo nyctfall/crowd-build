@@ -5,7 +5,7 @@ import fs from "node:fs"
 import express, { ErrorRequestHandler } from "express"
 import cons from "consolidate"
 import cors from "cors"
-import { dbgLog } from "~types/api"
+import { dbgLog, HTTPStatusCode } from "~types/api"
 import { assetsRouter } from "./assets-router"
 import { dbHandler } from "./database"
 import { login } from "./login"
@@ -91,9 +91,9 @@ app.use("/api/v1", dbHandler, login)
 
 app.get("/*", (req, res) => {
   // const mapping = MANIFEST_JSON["src/main.tsx"]
-  const mapping = Object.values(
-    MANIFEST_JSON as Record<string, Record<string, string | string[] | boolean>>
-  ).filter(chunk => chunk.isEntry)
+  const mapping = Object.values(MANIFEST_JSON as Record<string, Record<string, string | string[] | boolean>>).filter(
+    chunk => chunk.isEntry
+  )
 
   // vite dev script for React.js HMR:
   const VITE_DEV = `
@@ -106,9 +106,7 @@ app.get("/*", (req, res) => {
     </script>
 
     <script type="module" src="http://localhost:${VITE_PORT}/@vite/client"></script>
-    <script type="module" src="http://localhost:${VITE_PORT}/${
-    mapping.find(chunk => "css" in chunk)?.src
-  }"></script>
+    <script type="module" src="http://localhost:${VITE_PORT}/${mapping.find(chunk => "css" in chunk)?.src}"></script>
 `
   // log("MANIFEST_JSON isEntry mapping", mapping, "VITE_DEV", VITE_DEV)
 
@@ -125,15 +123,20 @@ app.get("/*", (req, res) => {
 
 // error handler middleware, doesn't emit errors to clients:
 app.use(((err: Error, _req, res, _next) => {
-  log("Error Handling Middleware",
-    "error.name", err.name,
-    "error.message", err.message,
-    "error.cause", err.cause,
-    "error.stack", err.stack
+  log(
+    "Error Handling Middleware",
+    "error.name",
+    err.name,
+    "error.message",
+    err.message,
+    "error.cause",
+    err.cause,
+    "error.stack",
+    err.stack
   )
 
   // internal server error:
-  res.sendStatus(500)
+  res.sendStatus(HTTPStatusCode["Internal Server Error"])
 }) as ErrorRequestHandler)
 
 const server = app.listen(PORT, () => {
@@ -144,9 +147,4 @@ const server = app.listen(PORT, () => {
   )
 })
 
-export {
-  app,
-  server,
-  STATIC_ROOT,
-  PROJECT_ROOT
-}
+export { app, server, STATIC_ROOT, PROJECT_ROOT }
