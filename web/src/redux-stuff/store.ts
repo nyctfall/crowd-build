@@ -4,7 +4,6 @@ import partsCache from "./reducers/partsCache"
 import myListId from "./reducers/myList"
 import listsCache from "./reducers/listsCache"
 import partSearchParams from "./reducers/partSearchParams"
-import searchState from "./reducers/search-state"
 import session from "./reducers/session"
 
 export const store = configureStore({
@@ -13,7 +12,6 @@ export const store = configureStore({
     myListId,
     listsCache,
     partSearchParams,
-    searchState,
     session,
     [rtkQueryAPISlice.reducerPath]: rtkQueryAPISlice.reducer
   },
