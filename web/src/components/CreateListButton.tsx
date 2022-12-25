@@ -1,7 +1,9 @@
 import { useState } from "react"
+import { Container } from "react-bootstrap"
+import { skipToken } from "@reduxjs/toolkit/dist/query"
 import { dbgLog } from "~types/logger"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
-import { usePostListMutation } from "../redux-stuff/query"
+import { useGetListsQuery, usePostListMutation } from "../redux-stuff/query"
 import { addOneList } from "../redux-stuff/reducers/listsCache"
 import StatefulButton from "./StatefulButton"
 
@@ -20,23 +22,21 @@ const log = dbgLog.fileLogger("CreateListButton.tsx")
  * @param {?Function} props.onFunction Called on button click with RTK Query Action.
  */
 export default function CreateListButton({
-  disown,
+  disown = false,
   onClick,
   onFinish
 }: {
   disown?: boolean
   onClick?: Parameters<typeof StatefulButton>[0]["onClick"]
-  onFinish?: (arg: ReturnType<ReturnType<ReturnType<typeof usePostListMutation>[0]>["unwrap"]>) => any
+  onFinish?: (arg: Awaited<ReturnType<ReturnType<ReturnType<typeof usePostListMutation>[0]>["unwrap"]>>) => any
 }) {
   const Log = log.stackLogger("CreateListButton")
 
   const dispatch = useAppDispatch()
 
-  const {
-    myListId: { id: myListId },
-    listsCache,
-    session
-  } = useAppSelector(state => state)
+  const myListId = useAppSelector(state => state.myListId.id)
+  const listsCache = useAppSelector(state => state.listsCache)
+  const sessionToken = useAppSelector(state => state.session.token)
 
   // myList parts as part id array:
   const myListParts = listsCache.entities[myListId]?.parts
@@ -52,43 +52,45 @@ export default function CreateListButton({
 
   // if there are myList contents, save list to database:
   const [trigger, saveListMut] = usePostListMutation()
+  const { isSuccess, isLoading, isError, data } = saveListMut
 
-  const { isSuccess, isLoading, isError, data, error } = saveListMut
+  // if list is deleted, allow save button to function again after being disabled:
+  const savedListQuery = useGetListsQuery(data && isSuccess ? { id: data?._id } : skipToken)
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     const log = Log.stackLoggerInc("handleClick")
 
     // prettier-ignore
     log(
+      "disown", disown,
+      "sessionToken", sessionToken,
+      "isIdentical", isIdentical,
+      "myListParts", myListParts,
       "myListId", myListId,
       "savedMyListParts", savedMyListParts,
-      "myListParts", myListParts,
-      "data", data,
-      "error", error,
+      "savedListQuery",savedListQuery,
       "saveListMut", saveListMut
     )
 
     if (myListParts?.length) {
-      ;(async () => {
-        try {
-          const mutRes = trigger({
-            parts: myListParts,
-            token: session.token && !disown ? session.token : undefined
-          })
+      try {
+        const data = await trigger({
+          parts: myListParts,
+          token: !disown ? sessionToken : undefined
+        }).unwrap()
 
-          log("mutRes", mutRes)
+        log("data", data)
 
-          const data = await mutRes.unwrap()
+        // remember parts to prevent saving an identical list:
+        setSavedMyListParts(myListParts)
 
-          log("data", data)
+        dispatch(addOneList(data))
 
-          setSavedMyListParts(myListParts)
-
-          dispatch(addOneList(data))
-        } catch (error) {
-          log.stackLoggerInc("catch").error("mutation error", error)
-        }
-      })()
+        // call parent handler:
+        onFinish?.(data)
+      } catch (error) {
+        log.stackLoggerInc("catch").error("mutation error", error)
+      }
     }
 
     // call parent handler:
@@ -96,19 +98,39 @@ export default function CreateListButton({
   }
 
   return (
-    <StatefulButton
-      variant="success"
-      variantLoading="outline-success"
-      variantUnclickable="outline-success"
-      variantError="danger"
-      isUnclickable={!myListParts || myListParts.length < 1 || isIdentical}
-      isLoading={isLoading}
-      isError={isError}
-      text="Save List"
-      textUnclickable={isSuccess ? "Saved" : "Save List"}
-      textError={"Saving Failed"}
-      onClick={handleClick}
-      onFinish={onFinish}
-    />
+    <>
+      {disown || sessionToken == null ? (
+        <StatefulButton
+          variant="success"
+          variantLoading="outline-success"
+          variantUnclickable="outline-success"
+          variantError="danger"
+          isUnclickable={(!myListParts || myListParts.length < 1 || isIdentical) && !savedListQuery.isError}
+          isLoading={isLoading}
+          isError={isError}
+          text="Save List"
+          textUnclickable={isSuccess ? `Saved${data ? `: ${data._id}` : ""}` : "Save List"}
+          textError={"Saving Failed"}
+          onClick={handleClick}
+          onFinish={onFinish}
+        />
+      ) : (
+        <StatefulButton
+          variant="success"
+          variantLoading="outline-success"
+          variantUnclickable="outline-success"
+          variantError="danger"
+          isUnclickable={(!myListParts || myListParts.length < 1 || isIdentical) && !savedListQuery.isError}
+          isLoading={isLoading}
+          isError={isError}
+          text="Save List As Owner"
+          textUnclickable={isSuccess ? `Saved${data ? `: ${data._id}` : ""}` : "Save List As Owner"}
+          textError={"Saving Failed"}
+          onClick={handleClick}
+          onFinish={onFinish}
+        />
+      )}
+      {data && !savedListQuery.isError ? <Container>Your new list ID: {data._id}</Container> : ""}
+    </>
   )
 }

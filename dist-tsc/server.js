@@ -9,6 +9,7 @@ const node_path_1 = __importDefault(require("node:path"));
 const express_1 = __importDefault(require("express"));
 const consolidate_1 = __importDefault(require("consolidate"));
 const cors_1 = __importDefault(require("cors"));
+const logger_1 = require("~types/logger");
 const api_1 = require("~types/api");
 const assets_router_1 = require("./assets-router");
 const database_1 = require("./database");
@@ -21,7 +22,7 @@ exports.PROJECT_ROOT = PROJECT_ROOT;
 const STATIC_ROOT = node_path_1.default.join(PROJECT_ROOT, "./dist");
 exports.STATIC_ROOT = STATIC_ROOT;
 const { PORT = 8080, VITE_PORT = 5173, NODE_ENV } = process.env;
-const log = api_1.dbgLog.fileLogger("server.ts");
+const log = logger_1.dbgLog.fileLogger("server.ts");
 app.use((0, cors_1.default)({
     origin: ["*", `http://localhost:${VITE_PORT}`, `http://localhost:${PORT}`]
 }));

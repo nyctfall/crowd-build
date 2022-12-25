@@ -25,7 +25,7 @@ export default function useLazyCacheList(
   const dispatch = useAppDispatch()
 
   // get store cache of all lists:
-  const { listsCache } = useAppSelector(state => state)
+  const listsCache = useAppSelector(state => state.listsCache)
 
   // PC part list ID to find the corresponding list:
   const [listId, setListId] = useState("")

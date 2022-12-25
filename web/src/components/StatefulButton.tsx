@@ -15,7 +15,7 @@ export default function StatefulButton(
     isLoading?: boolean
     isUnclickable?: boolean
     isError?: boolean
-    text?: string | JSX.Element
+    text: string | JSX.Element
     textLoading?: string | JSX.Element
     textUnclickable?: string | JSX.Element
     textError?: string | JSX.Element
@@ -44,13 +44,13 @@ export default function StatefulButton(
   } = props
 
   // button state color:
-  const buttonVariant = isLoading
+  const buttonVariant: Parameters<typeof Button>[0]["variant"] = isLoading
     ? variantLoading
     : isError
     ? variantError
     : isUnclickable
     ? variantUnclickable
-    : variant
+    : variant ?? "primary"
 
   // button loading spinner color:
   const spinnerVariant = buttonVariant?.replace("outline-", "")
@@ -98,13 +98,13 @@ export default function StatefulButton(
     <Button variant={buttonVariant} active={isLoading} disabled={isUnclickable} onClick={handleClick} {...attributes}>
       {isLoading ? (
         <>
-          {textLoading}
+          {textLoading ?? text}
           <Spinner variant={spinnerVariant} animation="border" />
         </>
       ) : isError ? (
-        textError
+        textError ?? text
       ) : isUnclickable ? (
-        textUnclickable
+        textUnclickable ?? text
       ) : (
         text
       )}

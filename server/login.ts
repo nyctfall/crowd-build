@@ -3,7 +3,8 @@ import passport from "passport"
 import passportJWT from "passport-jwt"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
-import { dbgLog, HTTPStatusCode, SessionType } from "~types/api"
+import { HTTPStatusCode, SessionType } from "~types/api"
+import { dbgLog } from "~types/logger"
 import { mongooseConnectPromise } from "./database"
 import Users, { UserType } from "./models/user"
 import Lists from "./models/list"
@@ -307,11 +308,11 @@ mongooseConnectPromise
     login.use((req, _res, next) => {
       // prettier-ignore
       log("login.use",
-      "req.user", req.user,
-      "req.authInfo", req.authInfo,
-      "req.isAuthenticated()", req.isAuthenticated?.(),
-      "req.isUnauthenticated()", req.isUnauthenticated?.()
-    )
+        "req.user", req.user,
+        "req.authInfo", req.authInfo,
+        "req.isAuthenticated()", req.isAuthenticated?.(),
+        "req.isUnauthenticated()", req.isUnauthenticated?.()
+      )
 
       next()
     })
@@ -560,7 +561,9 @@ mongooseConnectPromise
 
           Log("dbRes", dbRes)
 
-          res.json(dbRes)
+          if (!dbRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbRes)
+          else if (dbRes.deletedCount < 1) res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+          else res.json(dbRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -592,7 +595,10 @@ mongooseConnectPromise
 
           Log("dbRes", dbRes)
 
-          res.json(dbRes)
+          if (!dbRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbRes)
+          else if (dbRes.matchedCount < 1) res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+          else if (dbRes.modifiedCount < 1) res.status(HTTPStatusCode["Bad Request"]).json(dbRes)
+          else res.json(dbRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -635,7 +641,9 @@ mongooseConnectPromise
 
           Log("dbListRes", dbListRes)
 
-          res.json(dbListRes)
+          if (!dbListRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbListRes)
+          else if (dbListRes.deletedCount < 1) res.status(HTTPStatusCode["Bad Request"]).json(dbListRes)
+          else res.json(dbListRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -670,8 +678,10 @@ mongooseConnectPromise
 
           Log("dbRes", dbRes)
 
-          /** @todo improve responce codes for failed updates. */
-          res.json(dbRes)
+          if (!dbRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbRes)
+          else if (dbRes.matchedCount < 1) res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+          else if (dbRes.modifiedCount < 1) res.status(HTTPStatusCode["Bad Request"]).json(dbRes)
+          else res.json(dbRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -689,9 +699,8 @@ mongooseConnectPromise
           let dbListRes: Awaited<ReturnType<ReturnType<typeof Lists.updateMany | typeof Lists.deleteMany>["exec"]>>
 
           // disown all user owned lists:
-          if (req.body.keepLists) {
+          if (req.body.keepLists)
             dbListRes = await Lists.updateMany({ user: req.user?.id }, { $unset: { user: "" } }).exec()
-          }
           // delete all user owned lists:
           else dbListRes = await Lists.deleteMany({ user: req.user?.id }).exec()
 
@@ -705,7 +714,9 @@ mongooseConnectPromise
           Log("dbUserRes", dbUserRes)
 
           // return successful deletion:
-          res.json(dbUserRes)
+          if (!dbUserRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbUserRes)
+          else if (dbUserRes.deletedCount < 1) res.status(HTTPStatusCode["Not Found"]).json(dbUserRes)
+          else res.json(dbUserRes)
 
           // invalidate token by adding token to db of invalid tokens:
           const dbRes = await logoutJWT(req.authInfo?.token as string)

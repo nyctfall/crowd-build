@@ -24,17 +24,15 @@ export default function PCPartId(props: { partId: string; noToggle?: boolean }) 
     rtkQuery: { isError }
   } = partCache
 
-  return (
-    data ? (
-      <PCPart {...data} noToggle={!!noToggle} />
-    ) : (
-      <tr>
-        <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
-        <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
-        <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
-        <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
-        <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
-      </tr>
-    )
+  return data ? (
+    <PCPart {...data} noToggle={!!noToggle} />
+  ) : (
+    <tr>
+      <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
+      <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
+      <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
+      <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
+      <Placeholder as="td" animation="glow" bg={isError ? "danger" : "secondary"} style={{ height: "3em" }} />
+    </tr>
   )
 }

@@ -50,10 +50,7 @@ export default function App() {
   // const Log = log.stackLogger("App")
 
   // login session state:
-  const state = useAppSelector(state => state)
-  const { session } = state
-
-  // Log("state", state)
+  const isLoggedIn = useAppSelector(state => state.session.isLoggedIn)
 
   return (
     <>
@@ -62,7 +59,7 @@ export default function App() {
 
         <main className="flex-fill">
           <Routes>
-            {session.isLoggedIn ? (
+            {isLoggedIn ? (
               <>
                 {(
                   [

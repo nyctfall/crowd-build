@@ -13,51 +13,50 @@ const log = dbgLog.fileLogger("EditListButton.tsx")
  *
  * Cannot edit lists owned by other users.
  *
- * @param {string} props.id The database id of the list to edit.
+ * @param {string} props.listId The database id of the list to edit.
+ * @param {string} props.owned The list to edit is owned by a user, should be false if not owned by a user.
  */
 export default function EditListButton({
-  id,
+  listId,
+  owned,
   onClick,
   onFinish
 }: {
-  id: string
+  listId: string
+  owned: boolean
   onClick?: Parameters<typeof StatefulButton>[0]["onClick"]
-  onFinish?: Parameters<typeof StatefulButton>[0]["onFinish"]
+  onFinish?: (arg: Awaited<ReturnType<ReturnType<ReturnType<typeof usePatchListMutation>[0]>["unwrap"]>>) => any
 }) {
   const Log = log.stackLogger("EditListButton")
 
   const dispatch = useAppDispatch()
 
-  const {
-    myListId: { id: myListId },
-    listsCache,
-    session
-  } = useAppSelector(state => state)
+  const myListId = useAppSelector(state => state.myListId.id)
+  const listsCache = useAppSelector(state => state.listsCache)
+  const sessionToken = useAppSelector(state => state.session.token)
 
   // the PC part ids from myList to overwrite the target list with:
   const myListParts = listsCache.entities[myListId]?.parts
 
-  // no-op if target list and myList have all the same parts,
-  // useMemo to only recomput on change and for performance in large lists:
+  // no-op if target list and myList have all the same parts:
   const isIdentical =
     myListParts &&
-    myListParts.length === listsCache.entities[id]?.parts.length &&
-    myListParts.every(partId => listsCache.entities[id]?.parts.includes(partId))
-
-  /** @todo track if myList or target lists was changed since last edit: */
+    myListParts.length === listsCache.entities[listId]?.parts.length &&
+    myListParts.every(partId => listsCache.entities[listId]?.parts.includes(partId))
 
   // setup patch request:
   const [trigger, editRes] = usePatchListMutation()
-  const { isSuccess, isLoading, isUninitialized, isError, data } = editRes
+  const { isLoading, isUninitialized, isError, data } = editRes
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     const log = Log.stackLoggerInc("handleClick")
 
     // prettier-ignore
     log(
-      "session", session,
+      "owned", owned,
+      "sessionToken", sessionToken,
       "myListId", myListId,
-      "lists", listsCache,
+      "listsCache", listsCache,
       "myListParts", myListParts,
       "isIdentical", isIdentical,
       "editRes", editRes
@@ -65,24 +64,32 @@ export default function EditListButton({
 
     // update list in database with parts in myList:
     if (myListParts) {
-      const mutRes = trigger({
-        id,
-        token: session.token,
-        parts: myListParts
-      })
-
-      log("mutRes", mutRes)
-      ;(async () => {
-        const data = await mutRes.unwrap()
+      try {
+        const data = await trigger({
+          id: listId,
+          parts: myListParts,
+          token: owned ? sessionToken : undefined
+        }).unwrap()
 
         log("data", data)
 
         // update list in cache:
         if ((data as SessionType)?.success || (data as ModifyResponce)?.modifiedCount)
-          dispatch(updateOneList({ id: id, changes: { parts: myListParts } }))
-      })()
+          dispatch(
+            updateOneList({
+              id: listId,
+              changes: { parts: myListParts }
+            })
+          )
+
+        // call parent handler:
+        onFinish?.(data)
+      } catch (error) {
+        log.error("edit mut error", error)
+      }
     }
 
+    // call parent handler:
     onClick?.(e)
   }
 
@@ -104,7 +111,7 @@ export default function EditListButton({
       variant="warning"
       variantLoading="warning"
       variantUnclickable="outline-warning"
-      variantError="outline-secondary"
+      variantError="outline-warning"
       onClick={handleClick}
       onFinish={onFinish}
     />

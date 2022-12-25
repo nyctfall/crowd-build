@@ -57,6 +57,72 @@ const dbgErrorLog: LogFn = (file, trace, ...logs) => {
   }
 }
 
+const dbgInfoLog: LogFn = (file, trace, ...logs) => {
+  try {
+    console.info(
+      `INFO${"~".repeat(8)}${file}${"~".repeat(8)}INFO\n`,
+      `> ${[trace]
+        .flat(1)
+        .map(str => (str.endsWith(")") ? str : `${str}()`))
+        .join(" > ")}:\n`,
+      /* display the var name as: `\nVarName: ${VarValue}` */
+      ...logs.map((varNameOrVal: string | any, index) =>
+        index % 2 === 1
+          ? varNameOrVal
+          : `${(varNameOrVal as string)?.startsWith?.("\n") ? "" : "\n"}${varNameOrVal}${
+              (varNameOrVal as string)?.endsWith?.(":") ? "" : ":"
+            }`
+      )
+    )
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const dbgWarnLog: LogFn = (file, trace, ...logs) => {
+  try {
+    console.warn(
+      `WARN${"~".repeat(8)}${file}${"~".repeat(8)}WARN\n`,
+      `> ${[trace]
+        .flat(1)
+        .map(str => (str.endsWith(")") ? str : `${str}()`))
+        .join(" > ")}:\n`,
+      /* display the var name as: `\nVarName: ${VarValue}` */
+      ...logs.map((varNameOrVal: string | any, index) =>
+        index % 2 === 1
+          ? varNameOrVal
+          : `${(varNameOrVal as string)?.startsWith?.("\n") ? "" : "\n"}${varNameOrVal}${
+              (varNameOrVal as string)?.endsWith?.(":") ? "" : ":"
+            }`
+      )
+    )
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const dbgDebugLog: LogFn = (file, trace, ...logs) => {
+  try {
+    console.debug(
+      `DEBUG${"~".repeat(8)}${file}${"~".repeat(8)}DEBUG\n`,
+      `> ${[trace]
+        .flat(1)
+        .map(str => (str.endsWith(")") ? str : `${str}()`))
+        .join(" > ")}:\n`,
+      /* display the var name as: `\nVarName: ${VarValue}` */
+      ...logs.map((varNameOrVal: string | any, index) =>
+        index % 2 === 1
+          ? varNameOrVal
+          : `${(varNameOrVal as string)?.startsWith?.("\n") ? "" : "\n"}${varNameOrVal}${
+              (varNameOrVal as string)?.endsWith?.(":") ? "" : ":"
+            }`
+      )
+    )
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 /**
  * Helper for the debugging log helper, returns a function that calls the debug logger with a preset file name for all invokations.
  *
@@ -70,23 +136,32 @@ const dbgErrorLog: LogFn = (file, trace, ...logs) => {
 export const dbgFileLogger: FileLoggerFactory = file => {
   const fileFn: FileLogger = (trace, ...logs) => dbgLog(file, trace, ...logs)
   const fileErrFn: FileLogFn = (trace, ...logs) => dbgErrorLog(file, trace, ...logs)
+  const fileInfoFn: FileLogFn = (trace, ...logs) => dbgInfoLog(file, trace, ...logs)
+  const fileWarnFn: FileLogFn = (trace, ...logs) => dbgWarnLog(file, trace, ...logs)
+  const fileDebugFn: FileLogFn = (trace, ...logs) => dbgDebugLog(file, trace, ...logs)
 
   fileFn.file = file
 
   const stackLogger: StackLoggerFactory = (...stackTrace) => {
     const trace = stackTrace.flat()
-    
+
     const stackFn: StackLogger = (...logs) => fileFn(trace, ...logs)
-    
+
     stackFn.file = file
     stackFn.trace = trace
     stackFn.error = (...logs) => fileErrFn(trace, ...logs)
+    stackFn.info = (...logs) => fileInfoFn(trace, ...logs)
+    stackFn.warn = (...logs) => fileWarnFn(trace, ...logs)
+    stackFn.debug = (...logs) => fileDebugFn(trace, ...logs)
     stackFn.stackLoggerInc = (...nestedTrace) => stackLogger(...trace, ...nestedTrace.flat())
 
     return stackFn
   }
 
   fileFn.error = fileErrFn
+  fileFn.info = fileInfoFn
+  fileFn.warn = fileWarnFn
+  fileFn.debug = fileDebugFn
   fileFn.stackLogger = stackLogger
 
   return fileFn
@@ -166,6 +241,42 @@ export type Logger = {
    * dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
    */
   error: LogFn
+  /**
+   * Debugging info log helper, formats and prints values in a easy to read layout, with source file and stack-trace-like info.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @param logs The variables the logging function is outputing the values of.
+   * @example
+   * // in the form: ("string for variable name", variable):
+   * dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  info: LogFn
+  /**
+   * Debugging warn log helper, formats and prints values in a easy to read layout, with source file and stack-trace-like info.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @param logs The variables the logging function is outputing the values of.
+   * @example
+   * // in the form: ("string for variable name", variable):
+   * dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  warn: LogFn
+  /**
+   * Debugging debug log helper, formats and prints values in a easy to read layout, with source file and stack-trace-like info.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @param logs The variables the logging function is outputing the values of.
+   * @example
+   * // in the form: ("string for variable name", variable):
+   * dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  debug: LogFn
 }
 
 /**
@@ -204,6 +315,39 @@ export type FileLogger = {
    * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
    */
   error: FileLogFn
+  /**
+   * Helper for the debugging info log helper, returns a function that calls the debug logger with a preset file name for all invokations.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @example
+   * const log = dbgLog.fileLogger(file)
+   * log.error(trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  info: FileLogFn
+  /**
+   * Helper for the debugging warn log helper, returns a function that calls the debug logger with a preset file name for all invokations.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @example
+   * const log = dbgLog.fileLogger(file)
+   * log.error(trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  warn: FileLogFn
+  /**
+   * Helper for the debugging debug log helper, returns a function that calls the debug logger with a preset file name for all invokations.
+   *
+   * @readonly
+   * @param file The file the logging function is being called from.
+   * @example
+   * const log = dbgLog.fileLogger(file)
+   * log.error(trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  debug: FileLogFn
   /** @readonly */
   file?: string
 }
@@ -228,7 +372,7 @@ export type StackLogger = {
    * @example
    * const fileLogger = dbgLog.fileLogger(file)
    * const Log = fileLogger.stackLogger(trace1)
-   * 
+   *
    * // nested in a function
    * const log = fileLogger.stackLoggerInc(trace2)
    * log("variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
@@ -247,6 +391,42 @@ export type StackLogger = {
    * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
    */
   error: StackLogFn
+  /**
+   * Helper for the file debugging info log helper, returns a function that calls the debug file logger with a preset stack trace for all invokations.
+   *
+   * @readonly
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @example
+   * const fileLogger = dbgLog.fileLogger(file)
+   * const log = fileLogger.stackLogger(trace)
+   * log.error("variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  info: StackLogFn
+  /**
+   * Helper for the file debugging warn log helper, returns a function that calls the debug file logger with a preset stack trace for all invokations.
+   *
+   * @readonly
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @example
+   * const fileLogger = dbgLog.fileLogger(file)
+   * const log = fileLogger.stackLogger(trace)
+   * log.error("variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  warn: StackLogFn
+  /**
+   * Helper for the file debugging debug log helper, returns a function that calls the debug file logger with a preset stack trace for all invokations.
+   *
+   * @readonly
+   * @param trace The function location the logging function is being called from. Nested function should have a Function.name array.
+   * @example
+   * const fileLogger = dbgLog.fileLogger(file)
+   * const log = fileLogger.stackLogger(trace)
+   * log.error("variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   * // same as dbgLog.error(file, trace, "variableName1", varaibleName1, "variableName2", varaibleName2, ...etc)
+   */
+  debug: StackLogFn
   /** @readonly */
   file: string
   /** @readonly */
@@ -255,14 +435,17 @@ export type StackLogger = {
 
 dbgLog.fileLogger = dbgFileLogger
 dbgLog.error = dbgErrorLog
+dbgLog.info = dbgInfoLog
+dbgLog.warn = dbgWarnLog
+dbgLog.debug = dbgDebugLog
 
 export { dbgLog }
 
-/** From 
- * @see https://stackoverflow.com/questions/66298024/can-repeated-tuples-be-defined-in-typescript 
+/** From
+ * @see https://stackoverflow.com/questions/66298024/can-repeated-tuples-be-defined-in-typescript
  * @see https://dev.to/captainyossarian/how-to-flatten-a-tuple-type-in-typescript-1okm
  */
-// type RepeatedTuple<T extends LabelTuple> = 
+// type RepeatedTuple<T extends LabelTuple> =
 //   [...Omit<T, "0" | "1">, ...([T[0], T[1]] extends LabelTuple ? RepeatedTuple<T> : [])]
 // type Reducer<
 //   Arr extends ReadonlyArray<unknown>,
@@ -271,7 +454,7 @@ export { dbgLog }
 //   // if Arr is empty -> return Result
 //   (Arr extends readonly []
 //     ? Result
-//     // if Arr is not empty - destruct it 
+//     // if Arr is not empty - destruct it
 //     : (Arr extends readonly [infer Head, ...infer Tail]
 //       // check if Head is an Array
 //       ? (Head extends ReadonlyArray<any>
@@ -335,53 +518,53 @@ type lx49 = [...l, ...lx48]
 type lx50 = [...l, ...lx49]
 
 export type LogVariableLables =
-  Label |
-  lx2 |
-  lx3 |
-  lx4 |
-  lx5 |
-  lx6 |
-  lx7 |
-  lx8 |
-  lx9 |
-  lx10 |
-  lx11 |
-  lx12 |
-  lx13 |
-  lx14 |
-  lx15 |
-  lx16 |
-  lx17 |
-  lx18 |
-  lx19 |
-  lx20 |
-  lx21 |
-  lx22 |
-  lx23 |
-  lx24 |
-  lx25 |
-  lx26 |
-  lx27 |
-  lx28 |
-  lx29 |
-  lx30 |
-  lx31 |
-  lx32 |
-  lx33 |
-  lx34 |
-  lx35 |
-  lx36 |
-  lx37 |
-  lx38 |
-  lx39 |
-  lx40 |
-  lx41 |
-  lx42 |
-  lx43 |
-  lx44 |
-  lx45 |
-  lx46 |
-  lx47 |
-  lx48 |
-  lx49 |
-  lx50 
+  | Label
+  | lx2
+  | lx3
+  | lx4
+  | lx5
+  | lx6
+  | lx7
+  | lx8
+  | lx9
+  | lx10
+  | lx11
+  | lx12
+  | lx13
+  | lx14
+  | lx15
+  | lx16
+  | lx17
+  | lx18
+  | lx19
+  | lx20
+  | lx21
+  | lx22
+  | lx23
+  | lx24
+  | lx25
+  | lx26
+  | lx27
+  | lx28
+  | lx29
+  | lx30
+  | lx31
+  | lx32
+  | lx33
+  | lx34
+  | lx35
+  | lx36
+  | lx37
+  | lx38
+  | lx39
+  | lx40
+  | lx41
+  | lx42
+  | lx43
+  | lx44
+  | lx45
+  | lx46
+  | lx47
+  | lx48
+  | lx49
+  | lx50

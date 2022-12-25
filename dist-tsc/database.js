@@ -6,15 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.mongooseConnectPromise = exports.mongooseConnect = exports.dbHandler = void 0;
 const express_1 = __importDefault(require("express"));
 const mongoose_1 = __importDefault(require("mongoose"));
+const logger_1 = require("~types/logger");
 const api_1 = require("~types/api");
 const part_1 = __importDefault(require("./models/part"));
 const list_1 = __importDefault(require("./models/list"));
 const user_1 = __importDefault(require("./models/user"));
 const news_1 = __importDefault(require("./models/news"));
+const list_2 = __importDefault(require("./models/list"));
 const dbHandler = express_1.default.Router();
 exports.dbHandler = dbHandler;
 const { MONGODB = "mongodb://127.0.0.1:27017", REDIS } = process.env;
-const log = api_1.dbgLog.fileLogger("database.ts");
+const log = logger_1.dbgLog.fileLogger("database.ts");
 let mongooseConnectPromise;
 exports.mongooseConnectPromise = mongooseConnectPromise;
 let mongooseConnect;
@@ -163,7 +165,20 @@ exports.mongooseConnect = mongooseConnect;
                     user: { $exists: false }
                 }, { $set: { parts: req.body.parts } }).exec();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                if (!dbRes.acknowledged)
+                    res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbRes);
+                else if (dbRes.matchedCount < 1)
+                    res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
+                else if (dbRes.modifiedCount < 1) {
+                    const checkUserSetDbRes = await list_2.default.findById(req.params.id);
+                    Log("checkUserSetDbRes", checkUserSetDbRes);
+                    if (checkUserSetDbRes?.user)
+                        res.status(api_1.HTTPStatusCode["Forbidden"]).json(dbRes);
+                    else
+                        res.status(api_1.HTTPStatusCode["Bad Request"]).json(dbRes);
+                }
+                else
+                    res.json(dbRes);
             }
             catch (e) {
                 Log.error("err", e);
@@ -179,7 +194,18 @@ exports.mongooseConnect = mongooseConnect;
                     user: { $exists: false }
                 }).exec();
                 Log("dbRes", dbRes);
-                res.json(dbRes);
+                if (!dbRes.acknowledged)
+                    res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbRes);
+                else if (dbRes.deletedCount < 1) {
+                    const checkUserSetDbRes = await list_2.default.findById(req.params.id);
+                    Log("checkUserSetDbRes", checkUserSetDbRes);
+                    if (checkUserSetDbRes?.user)
+                        res.status(api_1.HTTPStatusCode["Forbidden"]).json(dbRes);
+                    else
+                        res.status(api_1.HTTPStatusCode["Bad Request"]).json(dbRes);
+                }
+                else
+                    res.json(dbRes);
             }
             catch (e) {
                 Log.error("err", e);
@@ -209,13 +235,7 @@ exports.mongooseConnect = mongooseConnect;
             const limit = Number(req.query.limit ?? Infinity);
             Log("offset", offset, "limit", limit);
             try {
-                const dbRes = await user_1.default
-                    .find()
-                    .select("-password")
-                    .sort({ createdAt: -1 })
-                    .skip(offset)
-                    .limit(limit)
-                    .exec();
+                const dbRes = await user_1.default.find().select("-password").sort({ createdAt: -1 }).skip(offset).limit(limit).exec();
                 Log("dbRes", dbRes);
                 if (dbRes.length > 0)
                     res.json(dbRes);

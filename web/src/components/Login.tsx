@@ -5,6 +5,7 @@ import { HTTPStatusCode } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useLazyPostLoginQuery } from "../redux-stuff/query"
 import { sessionLogin } from "../redux-stuff/reducers/session"
+import StatefulButton from "./StatefulButton"
 
 // debugging logger:
 const log = dbgLog.fileLogger("Login.tsx")
@@ -16,8 +17,6 @@ export default function Login({ createUser, onSubmit }: { createUser?: boolean; 
   const Log = log.stackLogger("Login")
 
   const dispatch = useAppDispatch()
-
-  const session = useAppSelector(state => state.session)
 
   // username and password to send to server:
   const [usernamePost, setUsername] = useState("")
@@ -41,6 +40,14 @@ export default function Login({ createUser, onSubmit }: { createUser?: boolean; 
   const RTKErrorHTTPStatusCode =
     error && "status" in error && typeof error.status === "number" ? error.status : undefined
 
+  const usernameIsValid =
+    (!typedUsername && typedUsername) || isSuccess || RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"]
+  const usernameIsInvalid =
+    isError &&
+    !typed &&
+    (RTKErrorHTTPStatusCode === HTTPStatusCode["Not Found"] || RTKErrorHTTPStatusCode === HTTPStatusCode["Conflict"])
+  const psswdIsInvalid = isError && !typed ? RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"] : undefined
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     const log = Log.stackLoggerInc("handleSubmit()")
 
@@ -60,40 +67,31 @@ export default function Login({ createUser, onSubmit }: { createUser?: boolean; 
     setUsername(usernameInput)
 
     // send request:
-    if (usernamePost && psswdPost) {
-      const queryRes = trigger({
-        username: usernameInput,
-        password: psswdInput,
-        createUser
-      })
+    if (usernameInput && psswdInput) {
+      try {
+        const data = await trigger({
+          username: usernameInput,
+          password: psswdInput,
+          createUser
+        }).unwrap()
 
-      log("queryRes", queryRes)
-      ;(async () => {
-        try {
-          const data = await queryRes.unwrap()
+        log("data", data)
 
-          log("data", data)
-
-          // set creds in store cache for auth:
-          dispatch(
-            sessionLogin({
-              user: data.user,
-              token: data.token
-            })
-          )
-        } catch (error) {
-          log.error("query error", error)
-        }
-      })()
+        // set creds in store cache for auth:
+        dispatch(
+          sessionLogin({
+            user: data.user,
+            token: data.token
+          })
+        )
+      } catch (error) {
+        log.error("query error", error)
+      }
     }
 
     // call parent handler:
     onSubmit?.(e)
   }
-
-  const usernameIsValid = isSuccess || !typedUsername || RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"]
-  const usernameIsInvalid = isError && !typed && RTKErrorHTTPStatusCode === HTTPStatusCode["Not Found"]
-  const psswdIsInvalid = isError && !typed ? RTKErrorHTTPStatusCode === HTTPStatusCode["Unauthorized"] : undefined
 
   return (
     <Form
@@ -154,15 +152,17 @@ export default function Login({ createUser, onSubmit }: { createUser?: boolean; 
       </Form.Group>
 
       <Row>
-        {/** @todo convert to stateful button */}
-        <Button
-          variant={isFetching ? "outline-primary" : isError && !typed ? "danger" : "primary"}
-          active={isFetching}
+        <StatefulButton
+          text="Send"
+          textLoading="Sending..."
+          variant="primary"
+          variantError="danger"
+          variantLoading="outline-primary"
+          isError={isError && !typed}
+          isLoading={isFetching}
           type="submit"
           className="col-sm-2 ms-auto me-3"
-        >
-          {isFetching ? <Spinner animation="border" /> : "Send"}
-        </Button>
+        />
       </Row>
     </Form>
   )

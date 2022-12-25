@@ -2,7 +2,7 @@
 require("dotenv").config({ path: "../.env" })
 import mongoose from "mongoose"
 import Parts from "./models/part"
-import News, { NewsType } from "./models/news"
+import News from "./models/news"
 
 /**
  * @file Initialize the mock database for use in docker compose.

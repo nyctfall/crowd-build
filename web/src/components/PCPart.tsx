@@ -33,10 +33,8 @@ export default function PCPart(props: PCPartInfo & { noToggle?: boolean; onClick
     typeInfo
   } = props
 
-  const {
-    myListId: { id: myListId },
-    listsCache
-  } = useAppSelector(state => state)
+  const listsCache = useAppSelector(state => state.listsCache)
+  const myListId = useAppSelector(state => state.myListId.id)
 
   // array of parts in myList:
   const myListParts = listsCache.entities[myListId]?.parts
@@ -73,7 +71,7 @@ export default function PCPart(props: PCPartInfo & { noToggle?: boolean; onClick
   }
 
   return (
-    <tr className="py-auto">
+    <tr className="py-auto align-middle">
       <td style={{ height: "max(15vh, 4rem)", width: "max(15vh, 4rem)" }}>
         <img src={img || "src/assets/react.svg"} alt={name} className="d-inline-block h-100" />
       </td>

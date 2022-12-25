@@ -130,15 +130,15 @@ export enum HTTPStatusCode {
    */
   "Created" = 201,
   /**
-   * The request has been received but not yet acted upon. It is noncommittal, since there is no way in HTTP to later send an asynchronous response indicating the outcome of the request. It is intended for cases where another process or server handles the request, or for batch processing. 
+   * The request has been received but not yet acted upon. It is noncommittal, since there is no way in HTTP to later send an asynchronous response indicating the outcome of the request. It is intended for cases where another process or server handles the request, or for batch processing.
    */
   "Accepted" = 202,
   /**
-   * This response code means the returned metadata is not exactly the same as is available from the origin server, but is collected from a local or a third-party copy. This is mostly used for mirrors or backups of another resource. Except for that specific case, the 200 OK response is preferred to this status. 
+   * This response code means the returned metadata is not exactly the same as is available from the origin server, but is collected from a local or a third-party copy. This is mostly used for mirrors or backups of another resource. Except for that specific case, the 200 OK response is preferred to this status.
    */
   "Non-Authoritative Information" = 203,
   /**
-   * There is no content to send for this request, but the headers may be useful. The user agent may update its cached headers for this resource with the new ones. 
+   * There is no content to send for this request, but the headers may be useful. The user agent may update its cached headers for this resource with the new ones.
    */
   "No Content" = 204,
   /**
@@ -170,7 +170,7 @@ export enum HTTPStatusCode {
    */
   "Moved Permanently" = 301,
   /**
-   * This response code means that the URI of requested resource has been changed temporarily. Further changes in the URI might be made in the future. Therefore, this same URI should be used by the client in future requests. 
+   * This response code means that the URI of requested resource has been changed temporarily. Further changes in the URI might be made in the future. Therefore, this same URI should be used by the client in future requests.
    */
   "Found" = 302,
   /**
@@ -178,14 +178,14 @@ export enum HTTPStatusCode {
    */
   "See Other" = 303,
   /**
-   * This is used for caching purposes. It tells the client that the response has not been modified, so the client can continue to use the same cached version of the response. 
+   * This is used for caching purposes. It tells the client that the response has not been modified, so the client can continue to use the same cached version of the response.
    */
   "Not Modified" = 304,
-  /** 
+  /**
    * @deprecated Defined in a previous version of the HTTP specification to indicate that a requested response must be accessed by a proxy. It has been deprecated due to security concerns regarding in-band configuration of a proxy.
-  */
+   */
   "Use Proxy" = 305,
-  /** 
+  /**
    * @deprecated This response code is no longer used; it is just reserved. It was used in a previous version of the HTTP/1.1 specification.
    */
   "unused" = 306,
@@ -202,7 +202,7 @@ export enum HTTPStatusCode {
    */
   "Bad Request" = 400,
   /**
-   * Although the HTTP standard specifies "unauthorized", semantically this response means "unauthenticated". That is, the client must authenticate itself to get the requested response. 
+   * Although the HTTP standard specifies "unauthorized", semantically this response means "unauthenticated". That is, the client must authenticate itself to get the requested response.
    */
   "Unauthorized" = 401,
   /**
@@ -214,11 +214,11 @@ export enum HTTPStatusCode {
    */
   "Forbidden" = 403,
   /**
-   * The server cannot find the requested resource. In the browser, this means the URL is not recognized. In an API, this can also mean that the endpoint is valid but the resource itself does not exist. Servers may also send this response instead of `403 Forbidden` to hide the existence of a resource from an unauthorized client. This response code is probably the most well known due to its frequent occurrence on the web. 
+   * The server cannot find the requested resource. In the browser, this means the URL is not recognized. In an API, this can also mean that the endpoint is valid but the resource itself does not exist. Servers may also send this response instead of `403 Forbidden` to hide the existence of a resource from an unauthorized client. This response code is probably the most well known due to its frequent occurrence on the web.
    */
   "Not Found" = 404,
   /**
-   * The request method is known by the server but is not supported by the target resource. For example, an API may not allow calling `DELETE` to remove a resource. 
+   * The request method is known by the server but is not supported by the target resource. For example, an API may not allow calling `DELETE` to remove a resource.
    */
   "Method Not Allowed" = 405,
   /**
@@ -238,7 +238,7 @@ export enum HTTPStatusCode {
    */
   "Conflict" = 409,
   /**
-   * This response is sent when the requested content has been permanently deleted from server, with no forwarding address. Clients are expected to remove their caches and links to the resource. The HTTP specification intends this status code to be used for "limited-time, promotional services". APIs should not feel compelled to indicate resources that have been deleted with this status code. 
+   * This response is sent when the requested content has been permanently deleted from server, with no forwarding address. Clients are expected to remove their caches and links to the resource. The HTTP specification intends this status code to be used for "limited-time, promotional services". APIs should not feel compelled to indicate resources that have been deleted with this status code.
    */
   "Gone" = 410,
   /**
@@ -250,7 +250,7 @@ export enum HTTPStatusCode {
    */
   "Precondition Failed" = 412,
   /**
-   * Request entity is larger than limits defined by server. The server might close the connection or return an `Retry-After` header field. 
+   * Request entity is larger than limits defined by server. The server might close the connection or return an `Retry-After` header field.
    */
   "Payload Too Large" = 413,
   /**
@@ -262,7 +262,7 @@ export enum HTTPStatusCode {
    */
   "Unsupported Media Type" = 415,
   /**
-   * The range specified by the `Range` header field in the request cannot be fulfilled. It's possible that the range is outside the size of the target URI's data. 
+   * The range specified by the `Range` header field in the request cannot be fulfilled. It's possible that the range is outside the size of the target URI's data.
    */
   "Range Not Satisfiable" = 416,
   /**
@@ -274,7 +274,7 @@ export enum HTTPStatusCode {
    */
   "I'm a teapot" = 418,
   /**
-   * The request was directed at a server that is not able to produce a response. This can be sent by a server that is not configured to produce responses for the combination of scheme and authority that are included in the request URI. 
+   * The request was directed at a server that is not able to produce a response. This can be sent by a server that is not configured to produce responses for the combination of scheme and authority that are included in the request URI.
    */
   "Misdirected Request" = 421,
   /**
@@ -294,11 +294,11 @@ export enum HTTPStatusCode {
    */
   "Too Early" = 425,
   /**
-   * The server refuses to perform the request using the current protocol but might be willing to do so after the client upgrades to a different protocol. The server sends an `Upgrade` header in a `426` response to indicate the required protocol(s). 
+   * The server refuses to perform the request using the current protocol but might be willing to do so after the client upgrades to a different protocol. The server sends an `Upgrade` header in a `426` response to indicate the required protocol(s).
    */
   "Upgrade Required" = 426,
   /**
-   * The origin server requires the request to be conditional. This response is intended to prevent the 'lost update' problem, where a client `GET`s a resource's state, modifies it and `PUT`s it back to the server, when meanwhile a third party has modified the state on the server, leading to a conflict. 
+   * The origin server requires the request to be conditional. This response is intended to prevent the 'lost update' problem, where a client `GET`s a resource's state, modifies it and `PUT`s it back to the server, when meanwhile a third party has modified the state on the server, leading to a conflict.
    */
   "Precondition Required" = 428,
   /**
@@ -306,7 +306,7 @@ export enum HTTPStatusCode {
    */
   "Too Many Requests" = 429,
   /**
-   * The server is unwilling to process the request because its header fields are too large. The request may be resubmitted after reducing the size of the request header fields. 
+   * The server is unwilling to process the request because its header fields are too large. The request may be resubmitted after reducing the size of the request header fields.
    */
   "Request Header Fields Too Large" = 431,
   /**
@@ -326,7 +326,7 @@ export enum HTTPStatusCode {
    */
   "Bad Gateway" = 502,
   /**
-   * The server is not ready to handle the request. Common causes are a server that is down for maintenance or that is overloaded. Note that together with this response, a user-friendly page explaining the problem should be sent. This response should be used for temporary conditions and the `Retry-After` HTTP header should, if possible, contain the estimated time before the recovery of the service. The webmaster must also take care about the caching-related headers that are sent along with this response, as these temporary condition responses should usually not be cached. 
+   * The server is not ready to handle the request. Common causes are a server that is down for maintenance or that is overloaded. Note that together with this response, a user-friendly page explaining the problem should be sent. This response should be used for temporary conditions and the `Retry-After` HTTP header should, if possible, contain the estimated time before the recovery of the service. The webmaster must also take care about the caching-related headers that are sent along with this response, as these temporary condition responses should usually not be cached.
    */
   "Service Unavailable" = 503,
   /**
@@ -356,7 +356,7 @@ export enum HTTPStatusCode {
   /**
    * Indicates that the client needs to authenticate to gain network access.
    */
-  "Network Authentication Required" = 511,
+  "Network Authentication Required" = 511
 }
 
 export interface NewsStory {
@@ -603,29 +603,32 @@ export const filterDB = (
 
 /**
  * Tests to see if LocalStorage and SessionStorage can be used.
- * 
+ *
  * From: @see https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API
  */
 export const storageAvailable = (type: "localStorage" | "sessionStorage") => {
   let storage
   try {
     storage = window[type]
-    const x = '__storage_test__'
+    const x = "__storage_test__"
     storage.setItem(x, x)
     storage.removeItem(x)
     return true
   } catch (e) {
-    return e instanceof DOMException && (
+    return (
+      e instanceof DOMException &&
       // everything except Firefox
-      e.code === 22 ||
-      // Firefox
-      e.code === 1014 ||
-      // test name field too, because code might not be present
-      // everything except Firefox
-      e.name === 'QuotaExceededError' ||
-      // Firefox
-      e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+      (e.code === 22 ||
+        // Firefox
+        e.code === 1014 ||
+        // test name field too, because code might not be present
+        // everything except Firefox
+        e.name === "QuotaExceededError" ||
+        // Firefox
+        e.name === "NS_ERROR_DOM_QUOTA_REACHED") &&
       // acknowledge QuotaExceededError only if there's something already stored
-      (storage && storage.length !== 0)
+      storage &&
+      storage.length !== 0
+    )
   }
 }

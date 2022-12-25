@@ -9,17 +9,26 @@ export type Logger = {
     (file: string, trace: string | string[], ...logs: LogVariableLables): void;
     fileLogger: FileLoggerFactory;
     error: LogFn;
+    info: LogFn;
+    warn: LogFn;
+    debug: LogFn;
 };
 export type FileLogger = {
     (trace: string | string[], ...logs: LogVariableLables): void;
     stackLogger: StackLoggerFactory;
     error: FileLogFn;
+    info: FileLogFn;
+    warn: FileLogFn;
+    debug: FileLogFn;
     file?: string;
 };
 export type StackLogger = {
     (...logs: LogVariableLables): void;
     stackLoggerInc: StackLoggerFactory;
     error: StackLogFn;
+    info: StackLogFn;
+    warn: StackLogFn;
+    debug: StackLogFn;
     file: string;
     trace: string | string[];
 };

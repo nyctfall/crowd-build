@@ -10,6 +10,7 @@ const passport_jwt_1 = __importDefault(require("passport-jwt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const api_1 = require("~types/api");
+const logger_1 = require("~types/logger");
 const database_1 = require("./database");
 const user_1 = __importDefault(require("./models/user"));
 const list_1 = __importDefault(require("./models/list"));
@@ -19,7 +20,7 @@ exports.login = login;
 const { SECRET = "" } = process.env;
 if (!SECRET)
     console.error(`\n\tERROR! Error: SECRET should be defined in ".env" file.`.repeat(10));
-const log = api_1.dbgLog.fileLogger("login.ts");
+const log = logger_1.dbgLog.fileLogger("login.ts");
 const maxAge = 1000 * 60 * 10;
 const jwtSign = (payload) => new Promise((resolve, reject) => jsonwebtoken_1.default.sign(payload, SECRET, {
     expiresIn: `${maxAge}ms`,
@@ -297,7 +298,12 @@ database_1.mongooseConnectPromise
         try {
             const dbRes = await list_1.default.deleteMany({ user: req.user?.id }).exec();
             Log("dbRes", dbRes);
-            res.json(dbRes);
+            if (!dbRes.acknowledged)
+                res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbRes);
+            else if (dbRes.deletedCount < 1)
+                res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
+            else
+                res.json(dbRes);
         }
         catch (e) {
             Log.error("err", e);
@@ -317,7 +323,14 @@ database_1.mongooseConnectPromise
                 $set: { parts: req.body.parts }
             }).exec();
             Log("dbRes", dbRes);
-            res.json(dbRes);
+            if (!dbRes.acknowledged)
+                res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbRes);
+            else if (dbRes.matchedCount < 1)
+                res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
+            else if (dbRes.modifiedCount < 1)
+                res.status(api_1.HTTPStatusCode["Bad Request"]).json(dbRes);
+            else
+                res.json(dbRes);
         }
         catch (e) {
             Log.error("err", e);
@@ -342,7 +355,12 @@ database_1.mongooseConnectPromise
                 user: req.user?.id
             }).exec();
             Log("dbListRes", dbListRes);
-            res.json(dbListRes);
+            if (!dbListRes.acknowledged)
+                res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbListRes);
+            else if (dbListRes.deletedCount < 1)
+                res.status(api_1.HTTPStatusCode["Bad Request"]).json(dbListRes);
+            else
+                res.json(dbListRes);
         }
         catch (e) {
             Log.error("err", e);
@@ -363,7 +381,14 @@ database_1.mongooseConnectPromise
                 }
             }).exec();
             Log("dbRes", dbRes);
-            res.json(dbRes);
+            if (!dbRes.acknowledged)
+                res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbRes);
+            else if (dbRes.matchedCount < 1)
+                res.status(api_1.HTTPStatusCode["Not Found"]).json(dbRes);
+            else if (dbRes.modifiedCount < 1)
+                res.status(api_1.HTTPStatusCode["Bad Request"]).json(dbRes);
+            else
+                res.json(dbRes);
         }
         catch (e) {
             Log.error("err", e);
@@ -375,15 +400,19 @@ database_1.mongooseConnectPromise
         Log("req.user", req.user, "req.body", req.body);
         try {
             let dbListRes;
-            if (req.body.keepLists) {
+            if (req.body.keepLists)
                 dbListRes = await list_1.default.updateMany({ user: req.user?.id }, { $unset: { user: "" } }).exec();
-            }
             else
                 dbListRes = await list_1.default.deleteMany({ user: req.user?.id }).exec();
             Log("dbListRes", dbListRes);
             const dbUserRes = await user_1.default.deleteOne({ _id: req.user?.id }).exec();
             Log("dbUserRes", dbUserRes);
-            res.json(dbUserRes);
+            if (!dbUserRes.acknowledged)
+                res.status(api_1.HTTPStatusCode["Internal Server Error"]).json(dbUserRes);
+            else if (dbUserRes.deletedCount < 1)
+                res.status(api_1.HTTPStatusCode["Not Found"]).json(dbUserRes);
+            else
+                res.json(dbUserRes);
             const dbRes = await logoutJWT(req.authInfo?.token);
             Log("new Logouts dbRes", dbRes);
         }

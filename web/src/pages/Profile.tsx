@@ -21,10 +21,13 @@ export default function Profile() {
 
   const dispatch = useAppDispatch()
 
-  const { session } = useAppSelector(state => state)
+  const isLoggedIn = useAppSelector(state => state.session.isLoggedIn)
+  const sessionUser = useAppSelector(state => state.session.user)
+  const sessionToken = useAppSelector(state => state.session.token)
 
   // keep user data updated, to be used when editing user profile:
-  const { data: user } = useGetUserQuery(session.user ? session.user._id : skipToken, {
+  const { data: user } = useGetUserQuery(sessionUser ? sessionUser._id : skipToken, {
+    pollingInterval: 1000 * 60 * 5, // refetch every five minutes.
     refetchOnFocus: true,
     refetchOnMountOrArgChange: true,
     refetchOnReconnect: true
@@ -39,16 +42,23 @@ export default function Profile() {
   // const [triggerUpdate, mutUpdateRes] = usePatchUserMutation()
 
   // delete user account and all user owned lists:
-  const handleClick = () => {
+  const handleClick = async () => {
+    const log = Log.stackLoggerInc("handleClick")
+
     // prettier-ignore
-    Log.stackLoggerInc("handleClick")(
+    log(
       "mutDeleteRes", mutDeleteRes,
       "deleteUserMut", deleteUserMut,
-      "session", session
+      "sessionToken", sessionToken,
+      "sessionUser", sessionUser,
+      "user", user
     )
 
-    if (confirm("THIS WILL DELETE YOUR ACCOUNT AND ALL OF YOUR LISTS!\nCONTINUE WITH DELETING?") && session.token) {
-      triggerDelete(session.token)
+    if (sessionToken && confirm("THIS WILL DELETE YOUR ACCOUNT AND ALL OF YOUR LISTS!\nCONTINUE WITH DELETING?")) {
+      const dltRes = await triggerDelete(sessionToken).unwrap()
+
+      log("dltRes", dltRes)
+
       dispatch(sessionLogout())
     }
   }
@@ -59,9 +69,12 @@ export default function Profile() {
 
       <hr />
 
+      {/** @debug  */}
       <h2>Session:</h2>
 
-      <pre className="text-start mx-5">{JSON.stringify(session, undefined, "  ")}</pre>
+      <pre className="text-start mx-5">
+        {JSON.stringify({ isLoggedIn, sessionUser, sessionToken }, undefined, "  ")}
+      </pre>
 
       <hr />
 

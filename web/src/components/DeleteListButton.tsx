@@ -1,5 +1,5 @@
 import { dbgLog } from "~types/logger"
-import type { DeleteResponce, SessionType } from "~types/api"
+import { HTTPStatusCode } from "~types/api"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useDeleteListMutation } from "../redux-stuff/query"
 import { removeOneList } from "../redux-stuff/reducers/listsCache"
@@ -13,69 +13,77 @@ const log = dbgLog.fileLogger("DeleteListButton.tsx")
  *
  * Cannot delete lists owned by other users.
  *
- * @param {string} props.id The database id of the list to delete.
+ * @param {string} props.listId The database id of the list to delete.
+ * @param {string} props.owned The list to delete is owned by logged in user, should be false if not owned by user.
  * @param {Function} props.onClick Additional onClick handler.
  * @param {Function} props.onFinish Additional RTK Query result handler.
  */
 export default function DeleteListButton({
-  id,
+  listId,
+  owned,
   onClick,
   onFinish
 }: {
-  id: string
+  listId: string
+  owned: boolean
   onClick?: Parameters<typeof StatefulButton>[0]["onClick"]
-  onFinish?: Parameters<typeof StatefulButton>[0]["onFinish"]
+  onFinish?: (arg: Awaited<ReturnType<ReturnType<ReturnType<typeof useDeleteListMutation>[0]>["unwrap"]>>) => any
 }) {
   const Log = log.stackLogger("DeleteListButton")
 
   const dispatch = useAppDispatch()
 
-  const { session } = useAppSelector(state => state)
+  const sessionToken = useAppSelector(state => state.session.token)
 
   // setup delete request:
   const [trigger, mutRes] = useDeleteListMutation()
-  const { isLoading, isSuccess, isUninitialized, data, isError } = mutRes
+  const { isLoading, isSuccess, isError, error } = mutRes
+
+  const RTKErrorHTTPStatusCode =
+    error && "status" in error && typeof error.status === "number" ? error.status : undefined
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     const log = Log.stackLoggerInc("handleClick")
 
     // prettier-ignore
     log(
+      "owned", owned,
+      "listId", listId,
       "mutRes", mutRes,
-      "session", session
+      "sessionToken", sessionToken
     )
 
-    // parent handler:
-    onClick?.(e)
-
     try {
+      // delete list in store cache:
+      dispatch(removeOneList(listId))
+
       // send delete list until database responce:
-      const mutRes = trigger({ id, token: session.token })
-
-      log("mutRes", mutRes)
-
-      const data = await mutRes.unwrap()
+      const data = await trigger({
+        id: listId,
+        token: owned ? sessionToken : undefined
+      }).unwrap()
 
       log("data", data)
 
-      // delete list in store cache:
-      if ((data as SessionType)?.success || (data as DeleteResponce)?.deletedCount) dispatch(removeOneList(id))
+      onFinish?.(data)
     } catch (error) {
       log.stackLoggerInc("catch").error("mutation error", error)
     }
+
+    // parent handler:
+    onClick?.(e)
   }
 
   return (
     <StatefulButton
-      isUnclickable={
-        isSuccess ||
-        ((!isUninitialized || isError) && !((data as SessionType)?.success || (data as DeleteResponce)?.deletedCount))
-      }
+      isUnclickable={isSuccess || RTKErrorHTTPStatusCode === HTTPStatusCode["Forbidden"]}
       isLoading={isLoading}
-      isError={isError}
+      isError={isError || !!error}
       text="Delete List"
       textUnclickable="Deleted"
-      textError={isError ? "Failed To Delete" : "Cannot Delete List"}
+      textError={
+        RTKErrorHTTPStatusCode === HTTPStatusCode["Forbidden"] ? "List Owned By Another User" : "Failed To Delete"
+      }
       textLoading="Deleting..."
       variant="danger"
       variantUnclickable="outline-danger"

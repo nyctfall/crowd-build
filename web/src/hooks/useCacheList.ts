@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { skipToken } from "@reduxjs/toolkit/dist/query"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useGetListsQuery } from "../redux-stuff/query"
@@ -30,7 +30,8 @@ export default function useCacheList(
   const dispatch = useAppDispatch()
 
   // get store cache of all lists:
-  const { listsCache, partsCache } = useAppSelector(state => state)
+  const partsCache = useAppSelector(state => state.partsCache)
+  const listsCache = useAppSelector(state => state.listsCache)
 
   // always get list from store cache:
   const list = id ? listsCache.entities[id] : undefined
@@ -44,6 +45,12 @@ export default function useCacheList(
   const populated = useCacheParts(list && list.parts && list.parts.length > 1 ? list.parts : [], {
     skip: skip || !populate || !list?.parts || list.parts.length < 1
   })
+
+  // RTK Query has it's own cache, which can become stale compared to store cache, so refetch if store cache is deleted or modified and out of date:
+  if (!skip && reCache) refetch()
+
+  // get initial value of cache state for list Id:
+  const preCached = useMemo(() => !!list, [id])
 
   // if store cache miss, add query data from RTK Query cache or database responce to store cache:
   useEffect(() => {
@@ -61,12 +68,6 @@ export default function useCacheList(
     if (data instanceof Array) dispatch(addManyLists(data))
     else if (data) dispatch(addOneList(data))
   }, [data])
-
-  // RTK Query has it's own cache, which can become stale compared to store cache, so refetch if store cache is deleted or modified and out of date:
-  if (!skip && reCache) refetch()
-
-  // get initial value of cache state:
-  const [preCached] = useState(!!list)
 
   // return data from cache, or res after insertion into cache:
   return {

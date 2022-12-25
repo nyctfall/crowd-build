@@ -1,5 +1,5 @@
-import { Button } from "react-bootstrap"
-import { LinkContainer } from "react-router-bootstrap"
+import { Button, Row } from "react-bootstrap"
+import { Link } from "react-router-dom"
 
 /**
  * @todo
@@ -7,40 +7,35 @@ import { LinkContainer } from "react-router-bootstrap"
  */
 export default function Root() {
   return (
-    <div style={{ minHeight: "80vh" }} className="d-flex flex-column justify-content-center align-items-stretch m-5">
-      <h1>Root</h1>
+    <div style={{ minHeight: "80vh" }} className="d-grid gap-5 m-5">
+      <Row>
+        <h1>Root</h1>
+        <hr />
+      </Row>
 
-      <hr />
-
-      <LinkContainer to="/signin">
-        <Button variant="info" className="align-center m-1 flex-fill align-middle fs-1">
+      <Link to="/signin">
+        <Button variant="info" className="fs-1 w-100 h-100">
           Sign In!
         </Button>
-      </LinkContainer>
+      </Link>
 
-      <br />
-
-      <LinkContainer to="/home">
-        <Button variant="secondary" className="align-center m-1 flex-fill align-middle fs-1">
+      <Link to="/home">
+        <Button variant="secondary" size="lg" className="fs-1 w-100 h-100">
           Home Page
         </Button>
-      </LinkContainer>
+      </Link>
 
-      <br />
-
-      <LinkContainer to="/my-list">
-        <Button variant="secondary" className="align-center m-1 flex-fill align-middle fs-1">
+      <Link to="/my-list">
+        <Button variant="secondary" size="lg" className="fs-1 w-100 h-100">
           Search for Lists to Copy!
         </Button>
-      </LinkContainer>
+      </Link>
 
-      <br />
-
-      <LinkContainer to="/database">
-        <Button variant="secondary" className="align-center m-1 flex-fill align-middle fs-1">
+      <Link to="/database">
+        <Button variant="secondary" size="lg" className="fs-1 w-100 h-100">
           Search for Parts to add to your list!
         </Button>
-      </LinkContainer>
+      </Link>
     </div>
   )
 }

@@ -1,8 +1,8 @@
-import { Button, Spinner } from "react-bootstrap"
 import { dbgLog } from "~types/logger"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { usePostLogoutMutation } from "../redux-stuff/query"
 import { sessionLogout } from "../redux-stuff/reducers/session"
+import StatefulButton from "./StatefulButton"
 
 // debugging logger:
 const log = dbgLog.fileLogger("Logout.tsx")
@@ -16,49 +16,51 @@ export default function LogOutButton() {
   const dispatch = useAppDispatch()
 
   // user login credentials state:
-  const session = useAppSelector(state => state.session)
-
-  const { isLoggedIn, token } = session
+  const isLoggedIn = useAppSelector(state => state.session.isLoggedIn)
+  const token = useAppSelector(state => state.session.token)
 
   // setup logout post req:
   const [trigger, signoutMut] = usePostLogoutMutation()
-  const { isLoading } = signoutMut
 
-  const handleClick = () => {
+  const { isLoading, isError } = signoutMut
+
+  const handleClick = async () => {
     const log = Log.stackLoggerInc("handleClick")
+
     // prettier-ignore
     log(
-      "session", session,
+      "isLoggedIn", isLoggedIn,
+      "token", token,
       "signoutMut", signoutMut
     )
 
     // send logout POST:
     if (token != undefined) {
-      const mutRes = trigger(token)
+      // remove global login state:
+      dispatch(sessionLogout())
 
-      log("mutRes", mutRes)
-      ;(async () => {
-        const data = await mutRes.unwrap()
+      try {
+        const data = await trigger(token).unwrap()
 
         log("data", data)
-
-        // remove global login state:
-        dispatch(sessionLogout())
-      })()
+      } catch (error) {
+        log.error("logout error", error)
+      }
     }
   }
 
   return (
-    /** @todo convert to stateful button */
-    <Button disabled={!isLoggedIn} variant={isLoggedIn ? "danger" : "outline-danger"} onClick={handleClick}>
-      {isLoading ? (
-        <>
-          Logging Out...
-          <Spinner animation="border" />
-        </>
-      ) : (
-        "Log Out"
-      )}
-    </Button>
+    <StatefulButton
+      text="Log Out"
+      textLoading="Logging Out..."
+      textUnclickable="Logged Out"
+      textError="Error"
+      variant="danger"
+      variantUnclickable="outline-danger"
+      isLoading={isLoading}
+      isUnclickable={!isLoggedIn}
+      isError={isError}
+      onClick={handleClick}
+    />
   )
 }

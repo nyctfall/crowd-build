@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
-import { Button, Container, Form, Spinner } from "react-bootstrap"
+import { Button, ButtonGroup, Container, Form, Spinner } from "react-bootstrap"
+import { skipToken } from "@reduxjs/toolkit/dist/query"
 import { dbgLog } from "~types/logger"
 import { useAppSelector } from "../redux-stuff/hooks"
+import { useGetListsQuery } from "../redux-stuff/query"
 import DeleteListButton from "./DeleteListButton"
 import EditListButton from "./EditListButton"
 import CopyListButton from "./CopyListButton"
-import useCacheList from "../hooks/useCacheList"
 import PCPartId from "./PCPartId"
 import PCPartListId from "./PCPartLIstId"
 
@@ -18,35 +19,33 @@ const log = dbgLog.fileLogger("SearchListDB.tsx")
 export default function SearchListDB({
   onGetList
 }: {
-  onGetList?: (listCache: ReturnType<typeof useCacheList>) => any
+  onGetList?: (listQuery: ReturnType<typeof useGetListsQuery>) => any
 }) {
   const Log = log.stackLogger("SearchListDB")
 
-  const { session } = useAppSelector(state => state)
+  const user = useAppSelector(state => state.session.user)
 
   // search list state:
   const [listInputId, setListInputId] = useState("")
   const [listSearchId, setListSearchId] = useState("")
 
   // get list from store cache or database:
-  const listCache = useCacheList(listSearchId)
-  const { data, rtkQuery } = listCache
-  const { isError, isFetching } = rtkQuery
+  const listQuery = useGetListsQuery(listSearchId ? { id: listSearchId } : skipToken)
+  const { isSuccess, isError, isFetching, data } = listQuery
 
   useEffect(() => {
     // prettier-ignore
-    Log.stackLoggerInc("useEffect(,[listCache])")(
+    Log.stackLoggerInc("useEffect(,[listQuery])")(
       "onGetList", onGetList,
       "listInputId", listInputId,
       "listSearchId", listSearchId,
-      "listCache", listCache,
-      "rtkQuery", rtkQuery,
-      "session", session
+      "listQuery", listQuery,
+      "user", user
     )
 
     // parent handler:
-    onGetList?.(listCache)
-  }, [listCache])
+    onGetList?.(listQuery)
+  }, [listQuery])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     const log = Log.stackLoggerInc("handleSubmit")
@@ -55,9 +54,9 @@ export default function SearchListDB({
     log(
       "listInputId", listInputId,
       "listSearchId", listSearchId,
-      "listCache", listCache,
-      "rtkQuery", rtkQuery,
-      "session", session
+      "listQuery", listQuery,
+      "user", user,
+      "e", e
     )
 
     e.preventDefault()
@@ -88,28 +87,65 @@ export default function SearchListDB({
       </Form>
 
       <Container fluid className="w-75">
-        {data ? (
+        {isFetching ? (
+          <Spinner animation="border" />
+        ) : isError ? (
+          "Sorry... can't find list with that id... :("
+        ) : isSuccess && data ? (
           data instanceof Array ? (
-            data.map(({ _id: id, user }, i) => (
+            data.map(({ _id: id, user: owner }, i) => (
               <>
                 <PCPartId key={i} partId={id} noToggle={true} />
-                <CopyListButton id={id} />
-                {!user || session.user?._id === user ? <EditListButton id={id} /> : ""}
-                {!user || session.user?._id === user ? <DeleteListButton id={id} /> : ""}
+                <ButtonGroup>
+                  <CopyListButton listId={id} />
+                  {owner ? (
+                    user?._id === owner ? (
+                      <EditListButton listId={id} owned={true} />
+                    ) : (
+                      ""
+                    )
+                  ) : (
+                    <EditListButton listId={id} owned={false} />
+                  )}
+                  {owner ? (
+                    user?._id === owner ? (
+                      <DeleteListButton listId={id} owned={true} />
+                    ) : (
+                      ""
+                    )
+                  ) : (
+                    <DeleteListButton listId={id} owned={false} />
+                  )}
+                </ButtonGroup>
               </>
             ))
           ) : (
             <>
               <PCPartListId listId={data._id} noToggle={true} />
-              <CopyListButton id={data._id} />
-              {!data.user || session.user?._id === data.user ? <EditListButton id={data._id} /> : ""}
-              {!data.user || session.user?._id === data.user ? <DeleteListButton id={data._id} /> : ""}
+
+              <ButtonGroup>
+                <CopyListButton listId={data._id} />
+                {data.user ? (
+                  user?._id === data.user ? (
+                    <EditListButton listId={data._id} owned={true} />
+                  ) : (
+                    ""
+                  )
+                ) : (
+                  <EditListButton listId={data._id} owned={false} />
+                )}
+                {data.user ? (
+                  user?._id === data.user ? (
+                    <DeleteListButton listId={user._id} owned={true} />
+                  ) : (
+                    ""
+                  )
+                ) : (
+                  <DeleteListButton listId={data._id} owned={false} />
+                )}
+              </ButtonGroup>
             </>
           )
-        ) : isFetching ? (
-          <Spinner animation="border" />
-        ) : isError ? (
-          "Sorry... can't find list with that id... :("
         ) : (
           ""
         )}

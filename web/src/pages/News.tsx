@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Col, Container, Row } from "react-bootstrap"
-import { dbgLog, NewsStory } from "~types/api"
+import { dbgLog } from "~types/logger"
+import { HTTPStatusCode, NewsStory } from "~types/api"
 import StatefulButton from "../components/StatefulButton"
 import { useGetNewsQuery } from "../redux-stuff/query"
 
@@ -35,7 +36,10 @@ export default function News() {
     }
   )
 
-  const { data, isFetching, isSuccess, isError } = newsQuery
+  const { data, isFetching, isSuccess, isError, error } = newsQuery
+
+  const RTKErrorHTTPStatusCode =
+    error && "status" in error && typeof error.status === "number" ? error.status : undefined
 
   useEffect(() => {
     // prettier-ignore
@@ -60,7 +64,7 @@ export default function News() {
       "newsQuery", newsQuery
     )
 
-    if (data?.length) setLatestNewsOffset(data.length + latestNewsOffset)
+    if (isSuccess && data.length === newsFetchLimit) setLatestNewsOffset(data.length + latestNewsOffset)
   }
 
   return (
@@ -86,16 +90,16 @@ export default function News() {
       <StatefulButton
         className="w-50 py-4 mb-5"
         text="More..."
-        textUnclickable="No more news"
+        textUnclickable="No More News Stories"
         textLoading="Loading..."
         textError="Error"
         isLoading={isFetching}
-        isError={isError}
-        isUnclickable={isSuccess && data.length < 1}
+        isError={isError && RTKErrorHTTPStatusCode !== HTTPStatusCode["Not Found"]}
+        isUnclickable={(data && data.length < newsFetchLimit) || RTKErrorHTTPStatusCode === HTTPStatusCode["Not Found"]}
         variant="primary"
         variantUnclickable="secondary"
         variantLoading="secondary"
-        variantError="outline-info"
+        variantError="secondary"
         onClick={handleClick}
       />
     </>

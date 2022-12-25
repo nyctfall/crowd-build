@@ -1,9 +1,7 @@
-import { useMemo, useState } from "react"
-import { Button } from "react-bootstrap"
 import { LinkContainer } from "react-router-bootstrap"
-import { dbgLog, filterDB, PCPartInfo } from "~types/api"
+import { Button } from "react-bootstrap"
+import { dbgLog } from "~types/logger"
 import { useAppSelector } from "../redux-stuff/hooks"
-import PCPartList from "../components/PCPartList"
 import SearchPart from "../components/SearchPart"
 
 // debugging logger:
@@ -13,16 +11,9 @@ const log = dbgLog.fileLogger("Database.tsx")
  * Search PC part database for parts to add to My List.
  */
 export default function Database() {
-  const Log = log.stackLogger("Database")
+  // const Log = log.stackLogger("Database")
 
-  // state for the search filters from store, if there was a previous search get data from store:
-  const {
-    myListId: { id: myListId },
-    listsCache
-  } = useAppSelector(state => state)
-
-  const myList = listsCache.entities[myListId]
-  const myListParts = myList?.parts
+  const myListParts = useAppSelector(state => state.listsCache.entities[state.myListId.id]?.parts)
 
   return (
     <>

@@ -2,7 +2,5 @@
  * Page for errors.
  */
 export default function ErrorPage() {
-  return (
-    <h1>ErrorPage</h1>
-  )
+  return <h1>ErrorPage</h1>
 }

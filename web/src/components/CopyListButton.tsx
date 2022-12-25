@@ -1,8 +1,7 @@
-import { useEffect } from "react"
 import { dbgLog } from "~types/logger"
 import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { updateOneList } from "../redux-stuff/reducers/listsCache"
-import useLazyCacheList from "../hooks/useLazyCacheList"
+import useCacheList from "../hooks/useCacheList"
 import StatefulButton from "./StatefulButton"
 
 // debugging logger:
@@ -11,38 +10,33 @@ const log = dbgLog.fileLogger("CopyListButton.tsx")
 /**
  * Add all parts on target list to myList.
  *
- * @param {string} props.id The database or entity id of the list to use.
+ * @param {string} props.listId The database or entity id of the list to use.
  * @param {?Function} props.onClick Additional onClick handler.
  * @param {?Function} props.onFinish Handler for the onClick RTK Query Action.
  */
 export default function CopyListButton({
-  id,
+  listId,
   onClick,
   onFinish
 }: {
-  id: string
+  listId: string
   onClick?: Parameters<typeof StatefulButton>[0]["onClick"]
-  onFinish?: (arg: Awaited<ReturnType<ReturnType<typeof useLazyCacheList>["trigger"]>>) => any
+  onFinish?: (arg: ReturnType<typeof useCacheList>) => any
 }) {
   const Log = log.stackLogger("CopyListButton")
 
   const dispatch = useAppDispatch()
 
-  const state = useAppSelector(state => state)
-  const {
-    myListId: { id: myListId },
-    partsCache,
-    listsCache
-  } = state
+  const myListId = useAppSelector(state => state.myListId.id)
+  const listsCache = useAppSelector(state => state.listsCache)
 
   // myList as array of part ids:
   const myList = listsCache.entities[myListId]?.parts
 
   // get list from id, should be from cache or fetch from database:
-  const listCache = useLazyCacheList()
+  const listCache = useCacheList(listId)
 
   const {
-    trigger,
     data: targetList,
     rtkQuery: { isError: isErrorList, isFetching },
     populated: {
@@ -55,27 +49,30 @@ export default function CopyListButton({
 
   // no-op if target list and myList have all the same parts:
   const isIdentical =
-    myList &&
-    targetListParts &&
-    myList.length === targetListParts.length &&
-    myList.every(partId => targetListParts.includes(partId))
+    // list hasn't loaded yet, unclickable:
+    !targetListParts
+      ? true
+      : // start myList by copying this list:
+      !myList
+      ? false
+      : // check for same parts in both lists:
+        myList.length === targetListParts.length && myList.every(partId => targetListParts.includes(partId))
 
-  // replace myList with target list:
-  useEffect(() => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    const log = Log.stackLoggerInc("handleClick")
+
     // prettier-ignore
-    Log.stackLoggerInc("useEffect(,[targetList])")(
+    log(
+      "listId", listId,
       "targetListParts", targetListParts,
       "targetList", targetList,
       "myList", myList,
       "isIdentical", isIdentical,
       "listCache", listCache,
-      "myListId", myListId,
-      "state.myListId", state.myListId,
-      "lists", listsCache,
-      "partsDB", partsCache
+      "myListId", myListId
     )
 
-    // get target list by id, then add all of it's parts to overwrite myList:
+    // overwrite myList parts with target lists parts:
     if (targetListParts)
       dispatch(
         updateOneList({
@@ -85,42 +82,10 @@ export default function CopyListButton({
           }
         })
       )
-  }, [targetList])
 
-  const handleClick = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    const log = Log.stackLoggerInc("handleClick")
-
-    // prettier-ignore
-    log(
-      "targetListParts", targetListParts,
-      "targetList", targetList,
-      "myList", myList,
-      "isIdentical", isIdentical,
-      "listCache", listCache,
-      "myListId", myListId,
-      "state.myListId", state.myListId,
-      "lists", listsCache,
-      "partsDB", partsCache
-    )
-
-    // get target list by id, then add all of it's parts to overwrite myList,
-    const listCacheRes = await trigger({ id }, true)
-
-    log("listCacheRes", listCacheRes)
-
-    if (listCacheRes.list)
-      dispatch(
-        updateOneList({
-          id: myListId,
-          changes: {
-            parts: listCacheRes.list.parts
-          }
-        })
-      )
-
-    // call parent handler:
+    // call parent handlers:
     onClick?.(e)
-    onFinish?.(listCacheRes)
+    onFinish?.(listCache)
   }
 
   return (
@@ -131,7 +96,7 @@ export default function CopyListButton({
       isLoading={isFetching}
       textUnclickable="Same As My List"
       isUnclickable={isIdentical}
-      variantUnclickable={"outline-secondary"}
+      variantUnclickable={"outline-info"}
       textError="Error Copying List"
       isError={isErrorList || isErrorParts}
       onClick={handleClick}

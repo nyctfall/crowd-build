@@ -1,10 +1,12 @@
 import express from "express"
 import mongoose from "mongoose"
-import { dbgLog, HTTPStatusCode } from "~types/api"
+import { dbgLog } from "~types/logger"
+import { HTTPStatusCode } from "~types/api"
 import Parts from "./models/part"
 import Lists from "./models/list"
 import Users from "./models/user"
 import News from "./models/news"
+import List from "./models/list"
 
 /**
  * @file The logic and HTTP handlers for the database quests and other db operations.
@@ -239,7 +241,16 @@ let mongooseConnect: Awaited<typeof mongooseConnectPromise>
 
           Log("dbRes", dbRes)
 
-          res.json(dbRes)
+          if (!dbRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbRes)
+          else if (dbRes.matchedCount < 1) res.status(HTTPStatusCode["Not Found"]).json(dbRes)
+          else if (dbRes.modifiedCount < 1) {
+            const checkUserSetDbRes = await List.findById(req.params.id)
+
+            Log("checkUserSetDbRes", checkUserSetDbRes)
+
+            if (checkUserSetDbRes?.user) res.status(HTTPStatusCode["Forbidden"]).json(dbRes)
+            else res.status(HTTPStatusCode["Bad Request"]).json(dbRes)
+          } else res.json(dbRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -260,7 +271,15 @@ let mongooseConnect: Awaited<typeof mongooseConnectPromise>
 
           Log("dbRes", dbRes)
 
-          res.json(dbRes)
+          if (!dbRes.acknowledged) res.status(HTTPStatusCode["Internal Server Error"]).json(dbRes)
+          else if (dbRes.deletedCount < 1) {
+            const checkUserSetDbRes = await List.findById(req.params.id)
+
+            Log("checkUserSetDbRes", checkUserSetDbRes)
+
+            if (checkUserSetDbRes?.user) res.status(HTTPStatusCode["Forbidden"]).json(dbRes)
+            else res.status(HTTPStatusCode["Bad Request"]).json(dbRes)
+          } else res.json(dbRes)
         } catch (e) {
           Log.error("err", e)
 
@@ -305,13 +324,7 @@ let mongooseConnect: Awaited<typeof mongooseConnectPromise>
 
       try {
         // get users:
-        const dbRes = await Users
-          .find()
-          .select("-password")
-          .sort({ createdAt: -1 })
-          .skip(offset)
-          .limit(limit)
-          .exec()
+        const dbRes = await Users.find().select("-password").sort({ createdAt: -1 }).skip(offset).limit(limit).exec()
 
         Log("dbRes", dbRes)
 

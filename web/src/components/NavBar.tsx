@@ -15,10 +15,10 @@ const log = dbgLog.fileLogger("NavBar.tsx")
  * @todo expand all dropdowns for collapsable nav for small screens, and make nav full height on small screens.
  */
 function NavBar() {
-  const Log = log.stackLogger("NavBar")
+  // const Log = log.stackLogger("NavBar")
 
   // user login state:
-  const { isLoggedIn, user } = useAppSelector(state => state.session)
+  const user = useAppSelector(state => state.session.user)
 
   // route path for dynamic nav:
   const loc = useLocation()
@@ -110,11 +110,11 @@ function NavBar() {
             <Nav.Item as="li">
               <NavDropdown
                 align="end"
-                title={isLoggedIn && user ? user.username : "Login"}
+                title={user ? user.username : "Login"}
                 menuVariant="dark"
                 className="dropdown-menu-right min-w"
               >
-                {isLoggedIn && user ? (
+                {user ? (
                   <>
                     <NavDropdown.Header className="text-center text-capitalize fs-4 fw-bold text-decoration-underline">
                       {user.username}

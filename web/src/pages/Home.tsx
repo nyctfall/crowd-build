@@ -8,7 +8,7 @@ const log = dbgLog.fileLogger("Home.tsx")
  * Home page with pc part and build pics.
  */
 export default function Home() {
-  const Log = log.stackLogger("Home")
+  // const Log = log.stackLogger("Home")
 
   /** @todo make DB query to get PC part pics, and link to part page */
   const imgs = [
@@ -28,7 +28,8 @@ export default function Home() {
   ]
 
   return (
-    <>{/** @todo improve it to be dynamicly loaded from most popular parts */}
+    <>
+      {/** @todo improve it to be dynamicly loaded from most popular parts */}
       <h1>Home</h1>
 
       <Carousel as="section" id="headliner-mini" variant="dark" interval={2500} pause={false}>

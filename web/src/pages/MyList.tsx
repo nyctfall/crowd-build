@@ -1,4 +1,4 @@
-import { Button, Container } from "react-bootstrap"
+import { Button, ButtonGroup, Container } from "react-bootstrap"
 import { LinkContainer } from "react-router-bootstrap"
 import { dbgLog } from "~types/logger"
 import { useAppSelector } from "../redux-stuff/hooks"
@@ -13,14 +13,10 @@ const log = dbgLog.fileLogger("MyList.tsx")
  * The main hub for most list operations, edit local myList, save local myList the database, search for database lists, use, edit, and delete lists from database.
  */
 export default function MyList() {
-  const Log = log.stackLogger("MyList")
+  // const Log = log.stackLogger("MyList")
 
-  const {
-    myListId: { id: myListId },
-    listsCache
-  } = useAppSelector(state => state)
-
-  const myListParts = listsCache.entities[myListId]?.parts
+  const myListParts = useAppSelector(state => state.listsCache.entities[state.myListId.id]?.parts)
+  const isLoggedIn = useAppSelector(state => state.session.isLoggedIn)
 
   return (
     <>
@@ -35,7 +31,10 @@ export default function MyList() {
           <PCPartListId partIds={myListParts} />
 
           <Container fluid className="mw-100 m-3 mx-auto">
-            <CreateListButton />
+            <ButtonGroup>
+              {isLoggedIn ? <CreateListButton disown={true} /> : ""}
+              <CreateListButton />
+            </ButtonGroup>
           </Container>
         </>
       ) : (

@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react"
-import { skipToken } from "@reduxjs/toolkit/query/react"
 import { ButtonToolbar, Container, Dropdown, DropdownButton, ToggleButton, ToggleButtonGroup } from "react-bootstrap"
 import { dbgLog } from "~types/logger"
 import { PCPartType } from "~types/api"
@@ -7,9 +5,9 @@ import { useAppDispatch, useAppSelector } from "../redux-stuff/hooks"
 import { useLazyGetPartsQuery } from "../redux-stuff/query"
 import { addManyParts } from "../redux-stuff/reducers/partsCache"
 import { setAllFilterTypes } from "../redux-stuff/reducers/partSearchParams"
-import { setReSearched, setSearched } from "../redux-stuff/reducers/search-state"
-import StatefulSeachButton from "./StatefulSearchButton"
 import PCPartList from "./PCPartList"
+import StatefulButton from "./StatefulButton"
+import { useEffect } from "react"
 
 // debugging logger:
 const log = dbgLog.fileLogger("SearchPart.tsx")
@@ -18,25 +16,38 @@ const log = dbgLog.fileLogger("SearchPart.tsx")
  * Search for PC parts by type.
  * @todo enable query string in url using React Router useQuery() hook
  */
-export default function SearchPart({
-  onGetSearch
-}: {
-  onGetSearch?: (searchQureyResult: ReturnType<typeof useLazyGetPartsQuery>) => any
-}) {
+export default function SearchPart() {
   const Log = log.stackLogger("SearchPart")
 
   const dispatch = useAppDispatch()
 
   // get search queryState from store, part type selected state:
-  const { partSearchParams: searchParams } = useAppSelector(state => state)
+  const searchParams = useAppSelector(state => state.partSearchParams)
 
   // fetch parts:
   const [trigger, searchQuery] = useLazyGetPartsQuery()
-  const { data, isFetching } = searchQuery
+  const { data, isFetching, isError, isSuccess } = searchQuery
+
+  // auto relaod previous search:
+  useEffect(() => {
+    // prettier-ignore
+    Log.stackLoggerInc("useEffect(,[])")(
+      "searchParams", searchParams
+    )
+
+    if (
+      searchParams.types.length > 0 ||
+      searchParams.oems.length > 0 ||
+      searchParams.ids.length > 0 ||
+      searchParams.minPrice ||
+      searchParams.maxPrice
+    )
+      trigger(searchParams, true)
+  }, [])
 
   // change search options:
   const handleToggle = (
-    e: React.MouseEvent<HTMLButtonElement | HTMLElement, MouseEvent> | React.ChangeEvent<HTMLInputElement>,
+    e: React.MouseEvent<HTMLElement, MouseEvent> | React.ChangeEvent<HTMLInputElement>,
     newPartType: PCPartType
   ) => {
     const log = Log.stackLoggerInc("handleToggle")
@@ -44,9 +55,16 @@ export default function SearchPart({
     // prettier-ignore
     log(
       "newPartType", newPartType,
+      // @ts-ignore
+      "e.target?.value", e.target?.value,
+      // @ts-ignore
+      "e.target?.name", e.target?.name,
+      // @ts-ignore
+      "e.target?.attributes?.value?.value", e.target?.attributes?.value?.value,
       "searchParams.types", searchParams.types,
       "searchParams", searchParams,
-      "e", e
+      "sesearchQuery",searchQuery,
+      "e", e,
     )
 
     // check same search option is not being set again:
@@ -62,16 +80,17 @@ export default function SearchPart({
 
     // prettier-ignore
     log(
-      "searching... queryState", searchParams,
+      "searchParams", searchParams,
+      "searchQuery", searchQuery,
       "e", e
     )
 
     try {
       // serach for part matching options:
       const partsQryRes = await trigger(searchParams, true).unwrap()
-  
+
       log("partsQryRes", partsQryRes)
-      
+
       // add the fetched parts to the store:
       dispatch(addManyParts(partsQryRes))
     } catch (e) {
@@ -96,6 +115,7 @@ export default function SearchPart({
                 name={type}
                 variant={`${searchParams.types.includes(type) ? "" : "outline-"}secondary`}
                 value={type}
+                active={searchParams.types.includes(type)}
                 onClick={e => handleToggle(e, type)}
               >
                 {type}
@@ -104,12 +124,7 @@ export default function SearchPart({
           </DropdownButton>
 
           {/* for large screens: toolbar */}
-          <ToggleButtonGroup
-            name="SearchPCPartType"
-            type="radio"
-            style={{ flexWrap: "wrap" }}
-            id="search-type-toolbar"
-          >
+          <ToggleButtonGroup name="SearchPCPartType" type="radio" style={{ flexWrap: "wrap" }} id="search-type-toolbar">
             {Object.values(PCPartType).map((type, i) => (
               <ToggleButton
                 key={i}
@@ -118,6 +133,7 @@ export default function SearchPart({
                 value={type}
                 name={type}
                 type="radio"
+                active={searchParams.types.includes(type)}
                 onChange={e => handleToggle(e, type)}
               >
                 {type}
@@ -125,17 +141,21 @@ export default function SearchPart({
             ))}
           </ToggleButtonGroup>
 
-          <StatefulSeachButton
-            isSearching={isFetching}
-            hasSearched={searchParams.types.length > 0}
-            canSearch={true}
-            handleSearch={handleSearch}
+          <StatefulButton
+            className="ms-auto"
+            isLoading={isFetching}
+            isError={isError}
+            variant="primary"
+            variantError="danger"
+            text="Search"
+            textLoading="Searching..."
+            onClick={handleSearch}
           />
         </ButtonToolbar>
       </Container>
 
       {data ? (
-        data.length > 0 ? (
+        !isError && !isFetching && isSuccess && data.length > 0 ? (
           <PCPartList list={data} />
         ) : (
           <h2>Sorry, no results matched that search...</h2>
