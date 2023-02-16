@@ -1,5 +1,6 @@
 // load dotenv .env before all modules:
-require("dotenv").config({ path: "../.env" })
+import dotenv from "dotenv"
+console.log(dotenv.config())
 import path from "node:path"
 import fs from "node:fs"
 import express, { ErrorRequestHandler } from "express"

@@ -1,5 +1,6 @@
 // load dotenv .env before all modules:
-require("dotenv").config({ path: "../.env" })
+import dotenv from "dotenv"
+console.log(dotenv.config())
 import mongoose from "mongoose"
 import Parts from "./models/part"
 import News from "./models/news"

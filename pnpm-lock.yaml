@@ -18,7 +18,6 @@ importers:
   server:
     specifiers:
       '@types/bcrypt': ^5.0.0
-      '@types/big.js': ^6.1.6
       '@types/consolidate': ^0.14.1
       '@types/cors': ^2.8.12
       '@types/eslint': ^8.4.10
@@ -32,8 +31,6 @@ importers:
       '@typescript-eslint/eslint-plugin': ^5.45.0
       '@typescript-eslint/parser': ^5.45.0
       bcrypt: ^5.1.0
-      big.js: ^6.2.1
-      chokidar-cli: ^3.0.0
       concurrently: ^7.5.0
       connect-mongo: ^4.6.0
       consolidate: ^0.16.0
@@ -56,12 +53,10 @@ importers:
       prettier-eslint-cli: ^7.1.0
       redis: ^4.5.0
       typescript: ^4.9.3
-      vite: ^3.2.4
       vitest: ^0.25.2
       ~types: link:../types
     dependencies:
       bcrypt: 5.1.0
-      big.js: 6.2.1
       connect-mongo: 4.6.0_4eh4abz4pghk6kpfasunhugc3q
       consolidate: 0.16.0_handlebars@4.7.7
       cors: 2.8.5
@@ -79,7 +74,6 @@ importers:
       ~types: link:../types
     devDependencies:
       '@types/bcrypt': 5.0.0
-      '@types/big.js': 6.1.6
       '@types/consolidate': 0.14.1
       '@types/cors': 2.8.12
       '@types/eslint': 8.4.10
@@ -92,7 +86,6 @@ importers:
       '@types/prettier': 2.7.1
       '@typescript-eslint/eslint-plugin': 5.45.0_czs5uoqkd3podpy6vgtsxfc7au
       '@typescript-eslint/parser': 5.45.0_hsf322ms6xhhd4b5ne6lb74y4a
-      chokidar-cli: 3.0.0
       concurrently: 7.5.0
       eslint: 8.28.0
       eslint-config-prettier: 8.5.0_eslint@8.28.0
@@ -101,7 +94,6 @@ importers:
       prettier: 2.8.0
       prettier-eslint-cli: 7.1.0
       typescript: 4.9.3
-      vite: 3.2.4_@types+node@18.11.9
       vitest: 0.25.2
 
   types:
@@ -2403,17 +2395,6 @@ packages:
     resolution: {integrity: sha512-BrgHpW9NURQgzoNyjfq0Wu6VFO6D7IZEmJNdtgNqpzGG8RuNFHt2jQxWlAs4HMe119chBnv+34syEZtc6IhLtA==}
     dev: true
 
-  /chokidar-cli/3.0.0:
-    resolution: {integrity: sha512-xVW+Qeh7z15uZRxHOkP93Ux8A0xbPzwK4GaqD8dQOYc34TlkqUhVSS59fK36DOp5WdJlrRzlYSy02Ht99FjZqQ==}
-    engines: {node: '>= 8.10.0'}
-    hasBin: true
-    dependencies:
-      chokidar: 3.5.3
-      lodash.debounce: 4.0.8
-      lodash.throttle: 4.1.1
-      yargs: 13.3.2
-    dev: true
-
   /chokidar/3.5.3:
     resolution: {integrity: sha512-Dr3sfKRP6oTcjf2JmUmFJfeVMvXBdegxB0iVQ5eb2V10uFJUCAS8OByZdVAyVb8xXNz3GjjTgj9kLWsZTqE6kw==}
     engines: {node: '>= 8.10.0'}
@@ -3917,10 +3898,6 @@ packages:
       p-locate: 5.0.0
     dev: true
 
-  /lodash.debounce/4.0.8:
-    resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
-    dev: true
-
   /lodash.defaults/4.2.0:
     resolution: {integrity: sha512-qjxPLHd3r5DnsdGacqOMU6pb/avJzdh9tFX2ymgoZE27BmjXrNy/y4LoaiTeAb+O3gL8AfpJGtqfX/ae2leYYQ==}
     dev: false
@@ -3964,10 +3941,6 @@ packages:
   /lodash.once/4.1.1:
     resolution: {integrity: sha512-Sb487aTOCr9drQVL8pIxOzVhafOjZN9UU54hiN8PU3uAiSV7lx1yYNpbNmex2PK6dSJoNTSJUUswT651yww3Mg==}
     dev: false
-
-  /lodash.throttle/4.1.1:
-    resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
-    dev: true
 
   /lodash/4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}

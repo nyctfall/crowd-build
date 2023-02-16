@@ -1,5 +1,6 @@
 # npm packages should be installed in production mode inside container:
 node_modules
+**/node_modules
 
 # Logs
 logs
@@ -11,6 +12,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 *.local
+
+# the Visual Studio Code, VSCodium, and Code-OSS editor workspace config file:
+*.code-workspace
 
 # Editor directories and files
 .vscode/*
@@ -26,12 +30,24 @@ lerna-debug.log*
 # MacOS default directory files:
 .fseventsd
 
-# the Visual Studio Code, VSCodium, and Code-OSS editor workspace config file:
-*.code-workspace
-
 # the Jest code-base coverage report:
 /coverage/
 **/lcov-report/
 
 # the typescript incremental compilation files:
 *.tsbuildinfo
+
+# exclide Git files
+*.git*
+
+# old Vite build dist
+dist*
+
+# Docker build stuff:
+Dockerfile
+.dockerignore
+docker-compose*
+
+# backend DB configs:
+redis.conf*
+mongo.conf*
